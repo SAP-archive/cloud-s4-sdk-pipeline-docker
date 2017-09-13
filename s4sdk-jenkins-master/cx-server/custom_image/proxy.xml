@@ -1,0 +1,10 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<proxy>
+    <name>proxy.wdf.sap.corp</name>
+    <port>8080</port>
+    <noProxyHost>*.sap.corp
+10.*
+localhost
+127.0.0.1
+0.0.0.0</noProxyHost>
+</proxy>
