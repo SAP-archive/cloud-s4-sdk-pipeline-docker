@@ -15,23 +15,23 @@ In order to run and build the Docker images you have to install [Docker](https:/
 
 To build a Docker image, such as s4sdk-jenkins-master, go to this folder and execute the following command:
 ```shell
- docker build -t jenkins-master-image .
+ $ docker build -t jenkins-master-image .
 ```
  
 Afterwards the image is avaialbe and a new container can be spawned with following command:
 ```shell
- docker run -p 8080:8080 --name my-jenkins jenkins-master-image
+ $ docker run -p 8080:8080 --name my-jenkins jenkins-master-image
 ```
 
 The same applies for all other Dockerfiles.
 
-The SAP S/4HANA Cloud SDK already provides a script called cx-server to avoid these manual steps. It can be found in the same named folder on the root of each SAP S/4HANA Cloud SDK project archetype. Together with the server.cfg file, this is all you need for starting your instance of the SAP S/4HANA Cloud SDK Cx Server.  
+The SAP S/4HANA Cloud SDK already provides a script called `cx-server` to avoid these manual steps. It can be found in the same named folder on the root of each SAP S/4HANA Cloud SDK project archetype. Together with the server.cfg file, this is all you need for starting your instance of the SAP S/4HANA Cloud SDK Cx Server.  
 For instantiating the SAP S/4HANA Cloud SDK Cx Server, you need to provide a suitable host with a linux operating system and Docker installed. Please also ensure that the user with whom you start the Cx Server belongs to the [docker group](https://docs.docker.com/engine/installation/linux/linux-postinstall/).
 
 To create a new project using the SDK execute the following command:
  
  ```shell
-  mvn archetype:generate -DarchetypeGroupId=com.sap.cloud.s4hana.archetypes -DarchetypeArtifactId=scp-cf-tomee -DarchetypeVersion=1.0.0
+  $ mvn archetype:generate -DarchetypeGroupId=com.sap.cloud.s4hana.archetypes -DarchetypeArtifactId=scp-cf-tomee -DarchetypeVersion=1.0.0
  ```
  
  In the new project there is a folder called cx-server.
@@ -40,7 +40,7 @@ To create a new project using the SDK execute the following command:
  On the host machine execute the following command in the folder cx-server.
  This will start the Jenkins server.
  ```shell
-  ./cx-server start
+  $ ./cx-server start
  ```
 
 ## Known Issues
