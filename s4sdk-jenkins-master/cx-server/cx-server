@@ -1,6 +1,6 @@
 #!/bin/bash
 
-script_url='https://github.wdf.sap.corp/raw/MA/s4sdk-jenkins-master/master/cx-server/cx-server'
+script_url='https://raw.githubusercontent.com/SAP/cloud-s4-sdk-pipeline-docker/master/s4sdk-jenkins-master/cx-server/cx-server'
 container_name='s4sdk-jenkins-master'
 
 function log_error()
