@@ -18,7 +18,7 @@ To build a Docker image, such as `s4sdk-jenkins-master`, go to this folder and e
  $ docker build -t s4sdk/jenkins-master-image .
 ```
  
-Afterwards the image is avaialbe and a new container can be spawned with following command:
+Afterwards the image is available and a new container can be spawned with following command:
 ```shell
  $ docker run -p 8080:8080 --name my-jenkins s4sdk/jenkins-master-image
 ```
