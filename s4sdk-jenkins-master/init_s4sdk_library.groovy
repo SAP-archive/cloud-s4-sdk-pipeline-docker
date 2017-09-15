@@ -3,7 +3,7 @@ import jenkins.model.*;
 import jenkins.plugins.git.GitSCMSource;
 import org.jenkinsci.plugins.workflow.libs.*;
 
-createIfMissing("s4sdk-pipeline-library", "https://github.com/SAP/cloud-s4-sdk-pipeline.git")
+createIfMissing("s4sdk-pipeline-library", "https://github.com/SAP/cloud-s4-sdk-pipeline-lib.git")
 // FIXME: Insert URL once known
 // createIfMissing("piper-pipeline-library", "https://github.com/SAP/cloud-piper.git")
 
