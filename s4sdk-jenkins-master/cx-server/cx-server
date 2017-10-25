@@ -18,7 +18,7 @@ function assert_config_set()
 function is_update_available()
 {
 	echo -n "Checking for newer version of this script on github (${script_url})... "
-	newest_version="$(curl --max-time 3 -s -f ${script_url})"
+	newest_version="$(curl --max-time 10 -s -f ${script_url})"
 	if [ $? -ne 0 ]; then
 		echo ""
 		log_error 'Failed to check for new version of this script.'
