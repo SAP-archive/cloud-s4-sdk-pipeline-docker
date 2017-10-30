@@ -1,7 +1,7 @@
-import hudson.model.*;
-import jenkins.model.*;
-import jenkins.plugins.git.GitSCMSource;
-import org.jenkinsci.plugins.workflow.libs.*;
+import hudson.model.*
+import jenkins.model.*
+import jenkins.plugins.git.GitSCMSource
+import org.jenkinsci.plugins.workflow.libs.*
 
 createIfMissing("s4sdk-pipeline-library", "https://github.com/SAP/cloud-s4-sdk-pipeline-lib.git")
 // FIXME: Insert URL once known
@@ -9,24 +9,24 @@ createIfMissing("s4sdk-pipeline-library", "https://github.com/SAP/cloud-s4-sdk-p
 
 def createIfMissing(String libName, String gitUrl) {
     GitSCMSource gitScmSource = new GitSCMSource(null, gitUrl, "", "origin", "+refs/heads/*:refs/remotes/origin/*", "*", "", true)
-    LibraryConfiguration lib = new LibraryConfiguration(libName, new SCMSourceRetriever(gitScmSource));
-    lib.setDefaultVersion("master");
-    lib.setImplicit(false);
-    lib.setAllowVersionOverride(true);
+    LibraryConfiguration lib = new LibraryConfiguration(libName, new SCMSourceRetriever(gitScmSource))
+    lib.defaultVersion = "master"
+    lib.implicit = false
+    lib.allowVersionOverride = true
 
-    GlobalLibraries globalLibraries = GlobalLibraries.get();
-    List libs = globalLibraries.getLibraries();
+    GlobalLibraries globalLibraries = GlobalLibraries.get()
+    List libs = globalLibraries.getLibraries()
 
-    boolean exists = false;
+    boolean exists = false
     for (LibraryConfiguration libConfig : libs) {
         if (libConfig.getName() == libName) {
-            exists = true;
-            break;
+            exists = true
+            break
         }
     }
 
     if (!exists) {
-        libs.add(lib);
-        globalLibraries.setLibraries(libs);
+        libs.add(lib)
+        globalLibraries.setLibraries(libs)
     }
 }
