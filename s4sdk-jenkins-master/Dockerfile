@@ -16,6 +16,7 @@ RUN apt-get update && \
     rm -rf /var/lib/apt/lists/* /var/cache/apt/*
 
 COPY init_s4sdk_library.groovy /usr/share/jenkins/ref/init.groovy.d/init_s4sdk_library.groovy
+COPY init_executors.groovy /usr/share/jenkins/ref/init.groovy.d/init_executors.groovy
 
 # install plugins
 COPY plugins.txt /usr/share/jenkins/ref/plugins.txt
