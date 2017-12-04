@@ -227,11 +227,16 @@ if [ "$1" == "start" ]; then
     fi
 
     # determine docker gid
-    docker_gid=$(getent group docker | cut -d: -f3)
+    docker_gid=$(grep "^docker" /etc/group|cut -d: -f3)
 
     if [ -z "${docker_gid}" ]; then
-        log_error "Failed to determine gid of 'docker'. Container might not be able to spawn sibling containers via docker socket.";
-        user_parameter="-u 1000"
+        log_info "Failed to determine gid of group 'docker'. This is the case if you are running on a non-Linux host such as macOS. Trying lookup from within container."
+        docker_gid=$(docker run --rm -v /var/run/docker.sock:/var/run/docker.sock busybox stat -c '%g' /var/run/docker.sock)
+    fi
+
+    if [ -z "${docker_gid}" ]; then
+        log_error "Failed to determine docker group id."
+        exit 1
     else
         user_parameter="-u 1000:${docker_gid}"
     fi

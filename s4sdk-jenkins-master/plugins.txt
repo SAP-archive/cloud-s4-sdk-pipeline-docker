@@ -36,7 +36,6 @@ extra-columns
 findbugs
 cloudbees-folder
 fortify-cloudscan-jenkins-plugin
-git-server
 gatling
 git-client
 git
