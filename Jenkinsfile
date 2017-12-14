@@ -1,6 +1,6 @@
 #!/usr/bin/env groovy
 
-@Library(['s4sdk-pipeline-library', 'piper-pipeline-library'])
+@Library(['pipelines-testing-lib'])
 
 def dockerImages = [
   ['folder': 's4sdk-docker-cf-cli', 'name': 's4sdk/docker-cf-cli'],
