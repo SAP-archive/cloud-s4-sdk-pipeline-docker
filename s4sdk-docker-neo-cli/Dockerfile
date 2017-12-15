@@ -5,4 +5,5 @@ RUN apt-get install -y maven
 
 RUN mvn com.sap.cloud:neo-javaee6-wp-maven-plugin:2.123.9:install-sdk -DsdkInstallPath=sdk -Dincludes=tools/**,license/**,sdk.version
 
-RUN chmod -R 777 sdk
+RUN chmod -R 777 sdk && \
+    ln -s /sdk/tools/neo.sh /usr/bin/neo.sh
