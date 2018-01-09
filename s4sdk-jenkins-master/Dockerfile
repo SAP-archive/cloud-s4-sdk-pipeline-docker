@@ -17,6 +17,7 @@ RUN apt-get update && \
 
 COPY init_s4sdk_library.groovy /usr/share/jenkins/ref/init.groovy.d/init_s4sdk_library.groovy.override
 COPY init_executors.groovy /usr/share/jenkins/ref/init.groovy.d/init_executors.groovy.override
+COPY launch-s4sdk-agent.sh /usr/share/jenkins/ref/launch-s4sdk-agent.sh.override
 
 # install plugins
 COPY plugins.txt /usr/share/jenkins/ref/plugins.txt
