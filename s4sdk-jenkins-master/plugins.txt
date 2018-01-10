@@ -138,3 +138,4 @@ xunit
 github-branch-source
 notification
 nexus-artifact-uploader
+command-launcher
