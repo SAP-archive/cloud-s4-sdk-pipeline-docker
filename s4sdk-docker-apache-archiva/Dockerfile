@@ -21,7 +21,7 @@ ENV ARCHIVA_BASE /var/archiva
 ### expose contextPath as environment variable
 ENV ARCHIVA_CONTEXT_PATH /
 
-ADD run-archiva /opt/archiva/run-archiva
+ADD run-archiva.sh /opt/archiva/run-archiva.sh
 
 ### start archiva, creating config and data dirs if needed
 ### allows starting fresh or mounting in ARCHIVA_BASE from host
