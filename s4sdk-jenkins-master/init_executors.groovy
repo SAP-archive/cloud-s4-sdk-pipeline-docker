@@ -2,6 +2,6 @@ import jenkins.model.*
 
 def instance = Jenkins.instance
 
-if(instance.getNumExecutors() < 4) {
-    instance.setNumExecutors(4)
+if(instance.getNumExecutors() < 6) {
+    instance.setNumExecutors(6)
 }
