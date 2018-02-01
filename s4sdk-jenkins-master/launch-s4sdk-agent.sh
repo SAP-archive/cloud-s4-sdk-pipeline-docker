@@ -63,4 +63,4 @@ if [ -n "$no_proxy" ]; then
   PROXY_ENV="$PROXY_ENV -e no_proxy=$no_proxy"
 fi
 
-$SSH_COMMAND $SSH_USER@$SSH_HOST docker run -i --rm -u 1000:$DOCKER_GID -v \`pwd\`/$REMOTE_DIR:/$REMOTE_DIR -v /var/run/docker.sock:/var/run/docker.sock $PROXY_ENV $DOCKER_IMAGE java -jar /$REMOTE_DIR/slave.jar
+$SSH_COMMAND $SSH_USER@$SSH_HOST docker run -i --rm --log-driver none -u 1000:$DOCKER_GID -v \`pwd\`/$REMOTE_DIR:/$REMOTE_DIR -v /var/run/docker.sock:/var/run/docker.sock $PROXY_ENV $DOCKER_IMAGE java -jar /$REMOTE_DIR/slave.jar
