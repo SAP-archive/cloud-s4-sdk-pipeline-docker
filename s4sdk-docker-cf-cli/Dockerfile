@@ -19,5 +19,3 @@ WORKDIR /home/piper
 
 RUN cf add-plugin-repo CF-Community https://plugins.cloudfoundry.org && \
     cf install-plugin blue-green-deploy -f -r CF-Community
-
-CMD ["--version"]
