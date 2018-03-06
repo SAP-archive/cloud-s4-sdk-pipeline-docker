@@ -2,7 +2,8 @@
 
 script_url='https://raw.githubusercontent.com/SAP/cloud-s4-sdk-pipeline-docker/master/s4sdk-jenkins-master/cx-server/cx-server'
 container_name='s4sdk-jenkins-master'
-
+backup_directory="$(pwd)/backup"
+backup_file_name="jenkins_home_$(date -u +%Y-%m-%dT%H%M%Z).tar.gz"
 function log_error()
 {
     echo -e "\033[1;31m[Error]\033[0m $1" >&2
@@ -13,11 +14,44 @@ function log_info()
     echo -e "\033[1;33m[Info]\033[0m $1" >&2
 }
 
+function log_warn()
+{
+    echo -e "\033[0;33m[Warning]\033[0m $1" >&2
+}
+
 function assert_config_set()
 {
     if [ -z "${!1}" ]; then
         log_error "Config parameter '$1' not set."; exit 1;
     fi
+}
+
+function backup_volume()
+{
+    if [ ! -d ${backup_directory} ]; then
+       log_info "Backup directory ${backup_directory} does not exist. Creating a new directory ${backup_directory}"
+       mkdir -p ${backup_directory}
+       if [ $? -ne "0" ]; then
+            log_error "Failed to create directory ${backup_directory}."
+            exit $?;
+       fi
+    fi
+
+    free_space=$(df -h ${backup_directory} | awk 'FNR > 1 {print $4}')
+    used_space=$(docker run -v ${jenkins_home}:/volume alpine du -sh /volume|awk '{print $1}')
+    log_info "Available free space on the host is ${free_space} and the size of the volume is ${used_space}"
+
+    # Backup can be taken when Jenkins server is up
+    # https://wiki.jenkins.io/display/JENKINS/Administering+Jenkins
+    log_info "Backup of ${jenkins_home} is in progress. It may take several minutes to complete."
+    docker run -it --rm -v ${backup_directory}:/backup -v ${jenkins_home}:/jenkins_home_volume -v $(pwd):/cx-server -w /cx-server alpine sh -c "tar czf /backup/${backup_file_name} -C /jenkins_home_volume . /cx-server/server.cfg;\
+                                                                                                                                                chmod u=rw,g=rw,o= /backup/${backup_file_name}"
+    if [ $? -ne "0" ]; then
+        log_error "Failed to backup ${jenkins_home}."
+        exit $?;
+    fi
+    log_info "Backup is completed and available at ${backup_directory} directory. File name is ${backup_file_name}"
+    log_warn "Please note, this backup contains sensitive information."
 }
 
 function is_update_available()
@@ -160,8 +194,9 @@ fi
 
 # ensure that docker is installed
 command -v docker > /dev/null 2>&1 || { echo >&2 "Docker does not seem to be installed. Please install docker and ensure that the docker command is included in \$PATH."; exit 1; }
-
-if [ "$1" == "start" ]; then
+if [ "$1" == "backup" ]; then
+    backup_volume
+elif [ "$1" == "start" ]; then
     # check if jenkins is running and abort if yes
     if is_jenkins_running; then
         exit 1;
@@ -347,5 +382,6 @@ else
     echo "   stop    Stops the running server container."
     echo "   remove  Removes a stopped server container. A subsequent call of 'start' will instantiate a fresh container."
     echo "   update  Updates this script to its newest version from github."
+    echo "   backup  Takes a backup of the ${jenkins_home} and stores it in a directory ${backup_directory}."
 
 fi
