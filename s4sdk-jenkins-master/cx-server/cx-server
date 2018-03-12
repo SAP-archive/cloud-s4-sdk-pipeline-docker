@@ -1,9 +1,11 @@
 #!/bin/bash
 
 script_url='https://raw.githubusercontent.com/SAP/cloud-s4-sdk-pipeline-docker/master/s4sdk-jenkins-master/cx-server/cx-server'
+
 container_name='s4sdk-jenkins-master'
 backup_directory="$(pwd)/backup"
 backup_file_name="jenkins_home_$(date -u +%Y-%m-%dT%H%M%Z).tar.gz"
+
 function log_error()
 {
     echo -e "\033[1;31m[Error]\033[0m $1" >&2
@@ -24,34 +26,6 @@ function assert_config_set()
     if [ -z "${!1}" ]; then
         log_error "Config parameter '$1' not set."; exit 1;
     fi
-}
-
-function backup_volume()
-{
-    if [ ! -d ${backup_directory} ]; then
-       log_info "Backup directory ${backup_directory} does not exist. Creating a new directory ${backup_directory}"
-       mkdir -p ${backup_directory}
-       if [ $? -ne "0" ]; then
-            log_error "Failed to create directory ${backup_directory}."
-            exit $?;
-       fi
-    fi
-
-    free_space=$(df -h ${backup_directory} | awk 'FNR > 1 {print $4}')
-    used_space=$(docker run -v ${jenkins_home}:/volume alpine du -sh /volume|awk '{print $1}')
-    log_info "Available free space on the host is ${free_space} and the size of the volume is ${used_space}"
-
-    # Backup can be taken when Jenkins server is up
-    # https://wiki.jenkins.io/display/JENKINS/Administering+Jenkins
-    log_info "Backup of ${jenkins_home} is in progress. It may take several minutes to complete."
-    docker run -it --rm -v ${backup_directory}:/backup -v ${jenkins_home}:/jenkins_home_volume -v $(pwd):/cx-server -w /cx-server alpine sh -c "tar czf /backup/${backup_file_name} -C /jenkins_home_volume . /cx-server/server.cfg;\
-                                                                                                                                                chmod u=rw,g=rw,o= /backup/${backup_file_name}"
-    if [ $? -ne "0" ]; then
-        log_error "Failed to backup ${jenkins_home}."
-        exit $?;
-    fi
-    log_info "Backup is completed and available at ${backup_directory} directory. File name is ${backup_file_name}"
-    log_warn "Please note, this backup contains sensitive information."
 }
 
 function is_update_available()
@@ -82,14 +56,14 @@ function is_update_available()
 
 function get_container_id()
 {
-    local container_id=$(docker ps --filter "name=${container_name}" -q)
+    local container_id=$(docker ps --filter "name=${1}" -q)
     echo "${container_id}"
 }
 
 function is_container_status()
 {
     #set -x
-    local container_id=$(docker ps --filter "name=${container_name}" --filter "status=${1}" -q)
+    local container_id=$(docker ps --filter "name=${1}" --filter "status=${2}" -q)
     if [ -z "${container_id}" ]; then
         false
     else
@@ -97,10 +71,12 @@ function is_container_status()
     fi
 }
 
-function is_jenkins_running() {
-    container_id="$(get_container_id)"
+#checks whether the supplied container name is running
+function is_running()
+{
+    local container_id="$(get_container_id "${1}")"
     if [ ! -z "$container_id" ]; then
-        log_info "The S/4HANA Cloud SDK Cx server is already running in container id '${container_id}'."
+        log_info "The ${1} container is already running with container id '${container_id}'."
         true
     else
         false
@@ -125,7 +101,7 @@ function retry()
             echo " success."
             return 0
         fi
-        sleep ${delay}
+        sleep "${delay}"
     done
 
     log_error "Command \"$*\" failed ${attempts} times."
@@ -144,29 +120,163 @@ function run()
     return $?
 }
 
-function wait_for_started() {
-    echo -n "Waiting for the S/4HANA Cloud SDK Cx server to start"
+# join , "${arr[@]}" => joins arr by commas to get comma separated string
+function join()
+{
+    local IFS="$1"
+    shift
+    echo "$*"
+}
+
+function get_proxy_parameters()
+{
+    local proxy_params=()
+    local behind_proxy=false
+
+    local image_name="${1}"
+
+    local image_http_proxy=$(get_image_environment_variable "${image_name}" http_proxy)
+    local image_https_proxy=$(get_image_environment_variable "${image_name}" https_proxy)
+    local image_no_proxy=$(get_image_environment_variable "${image_name}" no_proxy)
+
+    if [ ! -z "${http_proxy}" ]; then
+        proxy_params+=("-e HTTP_PROXY='${http_proxy}' -e http_proxy='${http_proxy}'")
+        behind_proxy=true
+    elif [ ! -z "${image_http_proxy}" ]; then
+        behind_proxy=true
+    fi
+
+
+    if [ ! -z "${https_proxy}" ]; then
+        proxy_params+=("-e HTTPS_PROXY='${https_proxy}' -e https_proxy='${https_proxy}'")
+        behind_proxy=true
+    elif [ ! -z "${image_https_proxy}" ]; then
+        behind_proxy=true
+    fi
+
+    local no_proxy_values=()
+    if [ ! -z "${image_no_proxy}" ]; then
+        # image default value
+        no_proxy_values=("${image_no_proxy}")
+    fi
+    if [ ! -z "${no_proxy}" ]; then
+        # overwrites potential image value
+        no_proxy_values=("${no_proxy}")
+    fi
+
+    if [ ! -z "${x_no_proxy}" ]; then
+        # append to whatever is there
+        no_proxy_values+=("${x_no_proxy}")
+    fi
+
+    if [ ${#no_proxy_values[@]} != 0 ]; then
+        local no_proxy_values_string="$(join , "${no_proxy_values[@]}")"
+        proxy_params+=("-e NO_PROXY='${no_proxy_values_string}' -e no_proxy='${no_proxy_values_string}'")
+    fi
+
+    local dbg_info=()
+    dbg_info+=("Proxy base settings of image '${image_name}':")
+    if [ ! -z "${image_http_proxy}" ];  then dbg_info+=("  http_proxy='${image_http_proxy}'"); fi;
+    if [ ! -z "${image_https_proxy}" ]; then dbg_info+=("  https_proxy='${image_https_proxy}'"); fi;
+    if [ ! -z "${image_no_proxy}" ];    then dbg_info+=("  no_proxy='${image_no_proxy}'"); fi;
+
+    dbg_info+=("Proxy settings of environment / server.cfg:")
+    if [ ! -z "${http_proxy}" ];  then dbg_info+=("  http_proxy='${http_proxy}'"); fi;
+    if [ ! -z "${https_proxy}" ]; then dbg_info+=("  https_proxy='${https_proxy}'"); fi;
+    if [ ! -z "${no_proxy}" ];    then dbg_info+=("  no_proxy='${no_proxy}'"); fi;
+    if [ ! -z "${x_no_proxy}" ];  then dbg_info+=("  x_no_proxy='${x_no_proxy}'"); fi;
+
+    dbg_info+=("Actual Command line params:")
+    dbg_info+=("$(join $'\n''  ' "${proxy_params[@]}")")
+    dbg_info+=(" ")
+
+    local dbg_info_str="$(join $'\n' "${dbg_info[@]}")"
+    # remove comment to dump debug information
+    #echo "${dbg_info_str}" >> "proxy.dump"
+
+    echo " ${proxy_params[*]}"
+}
+
+function wait_for_started()
+{
+    echo -n "Waiting for the Cx server to start"
     retry 120 1 0 curl -s "http://localhost:${http_port}/api/json"
+}
+
+function stop_jenkins()
+{
+    container_id="$(get_container_id "${container_name}")"
+    if [ -z "${container_id}" ]; then
+        log_info "The Cx server is not running."
+    else
+        echo 'Stopping Jenkins'
+        stop_jenkins_container
+    fi
+}
+
+function stop_jenkins_container()
+{
+    echo -n "Jenkins username (leave empty for unprotected server): "
+    read -r user_name
+
+    user_and_pass=()
+    if [ ! -z "${user_name}" ]; then
+        echo -n "Password for ${user_name}: "
+        read -r -s password
+        user_and_pass=(-u "${user_name}:${password}")
+    fi
+
+    echo ""
+    echo "Initiating safe shutdown..."
+
+    exitCmd=(docker exec ${container_name} curl -w '%{http_code}' -o /dev/null -s "${user_and_pass[@]}" -X POST 'http://localhost:8080/safeExit')
+
+    if [ ! -z "${password}" ]; then
+        trace_execution "${exitCmd[@]//${password}/******}"
+    else
+        trace_execution "${exitCmd[@]}"
+    fi
+
+    echo -n "Waiting for Cx server to accept safeExit signal..."
+    local attempts=120
+    local i
+    for ((i=0; i < attempts; i++)); do
+        echo -n "."
+        local result="$("${exitCmd[@]}")"
+        if [ "${result}" = "503" ]; then
+            sleep 1
+        elif [ "${result}" = "200" ]; then
+            echo " success."
+            break
+        elif [ "${result}" = "401" ]; then
+            echo ""
+            log_error "Wrong credentials."
+            exit 1
+        else
+            echo ""
+            log_error "Failed with code ${result}."
+            exit 1
+        fi
+    done
+
+    echo -n "Waiting for running jobs to finish..."
+    retry 360 5 0 "is_container_status ${container_name} 'exited'"
 }
 
 function get_image_environment_variable()
 {
-    cmd='echo $'"$2"
+    cmd='echo $'"${2}"
 
-    env_value="$(docker run --rm --entrypoint /bin/bash ${1} -c "${cmd}")"
+    env_value="$(docker run --rm --entrypoint /bin/bash "${1}" -c "${cmd}")"
     if [ $? -ne 0 ]; then
-        log_error "Failed to extract environment variable '$2' from image '$1'"; exit 1;
+        log_error "Failed to extract environment variable '${2}' from image '${1}'"
+        exit 1
     fi
-
     echo "${env_value}"
 }
 
-function print_config()
+function print_proxy_config()
 {
-    echo "   - jenkins_home=${jenkins_home}"
-    if [ ! -z "${x_java_opts}" ]; then
-        echo "   - x_java_opts=${x_java_opts}"
-    fi
     if [ ! -z "${http_proxy}" ]; then
         echo "   - http_proxy=${http_proxy}"
     fi
@@ -176,187 +286,149 @@ function print_config()
     if [ ! -z "${no_proxy}" ]; then
         echo "   - no_proxy=${no_proxy}"
     fi
+    if [ ! -z "${x_no_proxy}" ]; then
+        echo "   - x_no_proxy=${x_no_proxy}"
+    fi
+
+}
+function print_jenkins_config()
+{
+    echo "   - jenkins_home=${jenkins_home}"
+    if [ ! -z "${x_java_opts}" ]; then
+        echo "   - x_java_opts=${x_java_opts}"
+    fi
+    print_proxy_config
 }
 
-### Start of Script
-
-if is_update_available; then
-        echo ""
-        echo -e "\033[1mPlease run 'cx-server update' to update this script to its newest version.\033[0m"
-        echo ""
-fi
-
-source server.cfg
-if [ $? -ne 0 ]; then
-    log_error 'Failed to load config from server.cfg file.'
-    exit 1
-fi
-
-# ensure that docker is installed
-command -v docker > /dev/null 2>&1 || { echo >&2 "Docker does not seem to be installed. Please install docker and ensure that the docker command is included in \$PATH."; exit 1; }
-if [ "$1" == "backup" ]; then
-    backup_volume
-elif [ "$1" == "start" ]; then
-    # check if jenkins is running and abort if yes
-    if is_jenkins_running; then
-        exit 1;
-    fi
-
-    customDockerfileDir="custom_image"
-    if [ -e "${customDockerfileDir}/Dockerfile" ]; then
-        echo "Custom Dockerfile in '${customDockerfileDir} 'detected..."
-        echo "Starting **customized** docker container for S/4HANA Cloud SDK Cx Server."
-        echo "Parameters:"
-        echo "   - http_port=${http_port}"
-        echo "   - jenkins_home=${jenkins_home}"
-        print_config
-        echo ""
-
-        assert_config_set "http_port"
-
-        image_name="s4sdk/jenkins-master-customized"
-
-        run "docker build -t ${image_name} ${customDockerfileDir}"
-        if [ $? -ne "0" ]; then
-            log_error "Failed to build custom Dockerfile."
-            exit $?;
-        fi
+function start_jenkins()
+{
+    if ! is_running "${container_name}" ; then
+        start_jenkins_container
     else
-        echo "Starting docker container for S/4HANA Cloud SDK Cx Server."
-        echo "Parameters:"
-        echo "   - http_port=${http_port}"
-        echo "   - docker_registry=${docker_registry}"
-        echo "   - docker_image=${docker_image}"
-        print_config
-        echo ""
-
-        assert_config_set "http_port"
-        assert_config_set "docker_image"
-        assert_config_set "jenkins_home"
-
-        if [ ! -z "${docker_registry}" ]; then
-            image_name="${docker_registry}/${docker_image}"
-        else
-            image_name="${docker_image}"
-        fi
-
-        run "docker pull ${image_name}"
-        if [ $? -ne "0" ]; then
-            log_error "Failed to pull '$image_name'."
-            exit $?;
-        fi
+        log_info "Cx Server is already running."
     fi
+}
 
+function start_jenkins_container()
+{
     # check if exited and start if yes
-    if is_container_status "exited"; then
-        echo "Container was stopped. Restarting stopped instance..."
+    if is_container_status ${container_name} 'exited'; then
+        echo "Cx Server container was stopped. Restarting stopped instance..."
         run "docker start ${container_name}"
         if [ $? -ne "0" ]; then
             log_error "Failed to start existing cx-server container."
             exit $?;
         fi
-
-        wait_for_started
-
-        exit $?
-    fi
-
-    # determine docker gid
-    docker_gid=$(grep "^docker" /etc/group|cut -d: -f3)
-
-    if [ -z "${docker_gid}" ]; then
-        log_info "Failed to determine gid of group 'docker'. This is the case if you are running on a non-Linux host such as macOS. Trying lookup from within container."
-        docker_gid=$(docker run --rm -v /var/run/docker.sock:/var/run/docker.sock busybox stat -c '%g' /var/run/docker.sock)
-    fi
-
-    if [ -z "${docker_gid}" ]; then
-        log_error "Failed to determine docker group id."
-        exit 1
     else
-        user_parameter="-u 1000:${docker_gid}"
-    fi
+        customDockerfileDir="custom_image"
+        if [ -e "${customDockerfileDir}/Dockerfile" ]; then
+            echo "Custom Dockerfile in '${customDockerfileDir} 'detected..."
+            echo "Starting **customized** docker container for Cx Server."
+            echo "Parameters:"
+            echo "   - http_port=${http_port}"
+            echo "   - jenkins_home=${jenkins_home}"
+            print_jenkins_config
+            echo ""
+            assert_config_set "http_port"
 
-    # get JAVA_OPTS
-    environment_variable_parameters=""
-    if [ ! -z "${x_java_opts}" ]; then
-        container_java_opts="$(get_image_environment_variable ${image_name} JAVA_OPTS)"
-        effective_java_opts="-e JAVA_OPTS=\"${container_java_opts} ${x_java_opts}\""
-        environment_variable_parameters="${environment_variable_parameters} ${effective_java_opts}"
-    fi
+            image_name="s4sdk/jenkins-master-customized"
 
-    if [ ! -z "${http_proxy}" ]; then
-        environment_variable_parameters="${environment_variable_parameters} -e HTTP_PROXY=\"${http_proxy}\" -e http_proxy=\"${http_proxy}\""
-    fi
+            run "docker build -t ${image_name} ${customDockerfileDir}"
+            if [ $? -ne "0" ]; then
+                log_error "Failed to build custom Dockerfile."
+                exit $?;
+            fi
+        else
+            echo "Starting docker container for Cx Server."
+            echo "Parameters:"
+            echo "   - http_port=${http_port}"
+            echo "   - docker_registry=${docker_registry}"
+            echo "   - docker_image=${docker_image}"
+            print_jenkins_config
+            echo ""
 
-    if [ ! -z "${https_proxy}" ]; then
-        environment_variable_parameters="${environment_variable_parameters} -e HTTPS_PROXY=\"${https_proxy}\" -e https_proxy=\"${https_proxy}\""
-    fi
+            assert_config_set "http_port"
+            assert_config_set "docker_image"
+            assert_config_set "jenkins_home"
 
-    if [ ! -z "${no_proxy}" ]; then
-        environment_variable_parameters="${environment_variable_parameters} -e no_proxy=\"${no_proxy}\""
-    fi
+            if [ ! -z "${docker_registry}" ]; then
+                image_name="${docker_registry}/${docker_image}"
+            else
+                image_name="${docker_image}"
+            fi
+        fi
+        run "docker pull ${image_name}"
+        if [ $? -ne "0" ]; then
+            log_error "Failed to pull '$image_name'."
+            exit $?;
+        fi
 
-    mount_parameters="-v /var/run/docker.sock:/var/run/docker.sock -v ${jenkins_home}:/var/jenkins_home"
+         # determine docker gid
+        docker_gid=$(grep "^docker" /etc/group|cut -d: -f3)
 
-    # start container
-    run "docker run ${user_parameter} --name $container_name -d -p ${http_port}:8080 ${mount_parameters} ${environment_variable_parameters} ${image_name}"
-    if [ $? -ne "0" ]; then
-        log_error "Failed to start new cx-server container."
-        exit $?;
+        if [ -z "${docker_gid}" ]; then
+            log_info "Failed to determine gid of group 'docker'. This is the case if you are running on a non-Linux host such as macOS. Trying lookup from within container."
+            docker_gid=$(docker run --rm -v /var/run/docker.sock:/var/run/docker.sock busybox stat -c '%g' /var/run/docker.sock)
+        fi
+
+        if [ -z "${docker_gid}" ]; then
+            log_error "Failed to determine docker group id."
+            exit 1
+        else
+            user_parameter="-u 1000:${docker_gid}"
+        fi
+
+        if [ ! -z "${x_java_opts}" ]; then
+            local container_java_opts="$(get_image_environment_variable "${image_name}" JAVA_OPTS)"
+            local effective_java_opts="-e JAVA_OPTS=\"${container_java_opts} ${x_java_opts}\""
+        fi
+
+        local environment_variable_parameter=()
+        environment_variable_parameters+=("$(get_proxy_parameters "${image_name}")")
+        environment_variable_parameters+=(${effective_java_opts})
+        mount_parameters="-v /var/run/docker.sock:/var/run/docker.sock -v ${jenkins_home}:/var/jenkins_home"
+
+        # start container
+        run docker run ${user_parameter} --name "${container_name}" -d -p "${http_port}:8080" "${mount_parameters}" "${environment_variable_parameters[@]}" "${image_name}"
+        if [ $? -ne "0" ]; then
+            log_error "Failed to start new cx-server container."
+            exit $?;
+        fi
     fi
 
     wait_for_started
+}
 
-elif [ "$1" == "stop" ]; then
-    container_id="$(get_container_id)"
-    if [ -z "${container_id}" ]; then
-        log_info "The S/4HANA Cloud SDK Cx server is not running."; exit 1;
+function backup_volume()
+{
+    if [ ! -d ${backup_directory} ]; then
+       log_info "Backup directory ${backup_directory} does not exist. Creating a new directory ${backup_directory}"
+       mkdir -p ${backup_directory}
+       if [ $? -ne "0" ]; then
+            log_error "Failed to create directory ${backup_directory}."
+            exit $?;
+       fi
     fi
 
-    echo -n "Jenkins username (leave empty for unprotected server): "
-    read -r user_name
+    # FNR will skip the header and awk will print only 4th column of the output.
+    free_space=$(df -h ${backup_directory} | awk 'FNR > 1 {print $4}')
+    used_space=$(docker run -v ${jenkins_home}:/volume alpine du -sh /volume|awk '{print $1}')
+    log_info "Available free space on the host is ${free_space} and the size of the volume is ${used_space}"
 
-    user_and_pass=""
-    if [ ! -z "${user_name}" ]; then
-        echo -n "Password for ${user_name}: "
-        read -r -s password
-        user_and_pass="-u '${user_name}:${password}'"
+    # Backup can be taken when Jenkins server is up
+    # https://wiki.jenkins.io/display/JENKINS/Administering+Jenkins
+    log_info "Backup of ${jenkins_home} is in progress. It may take several minutes to complete."
+    docker run -it --rm --mount source=${backup_directory},target=/backup,type=bind -v ${jenkins_home}:/jenkins_home_volume -v $(pwd):/cx-server -w /cx-server alpine sh -c "tar czf /backup/${backup_file_name} -C /jenkins_home_volume . /cx-server/server.cfg && chmod u=rw,g=rw,o= /backup/${backup_file_name}"
+    if [ $? -ne "0" ]; then
+        log_error "Failed to backup ${jenkins_home}."
+        exit $?;
     fi
+    log_info "Backup is completed and available at ${backup_directory} directory. File name is ${backup_file_name}"
+    log_info "Please note, this backup contains sensitive information."
+}
 
-    echo ""
-    echo "Initiating safe shutdown..."
-
-    exitCmd="run docker exec ${container_id} curl -w '%{http_code}' -o /dev/null -s ${user_and_pass} -X POST 'http://localhost:8080/safeExit'"
-    output="$(${exitCmd})"
-    returnValue=$?
-
-    #echo $returnValue
-
-    if [ ! -z "${password}" ]; then
-        echo "${output//${password}/******}"
-    else
-        echo "${output}"
-    fi
-
-    if [ "${returnValue}" -eq "401" ]; then
-        log_error "Wrong credentials."; exit 1;
-    fi
-    echo -n "Waiting for running jobs to finish..."
-    retry 360 5 0 "(eval ${exitCmd}) > /dev/null 2>&1; is_container_status 'exited'"
-
-    #echo "Stopping container ${container_id}..."
-    #run "docker stop --time=60 ${container_id}"
-    exit $?;
-
-elif [ "$1" == "remove" ]; then
-    if ! is_container_status "exited" ; then
-        log_error "The S/4HANA Cloud SDK Cx server container ($container_name) is not in state 'exited'."; exit 1;
-    fi
-    run "docker rm ${container_name}"
-
-    exit $?
-
-elif [ "$1" == "update" ]; then
+function update_cx_server()
+{
     is_update_available > /dev/null 2>&1
     if [ ! -f 'cx-server.update' ]; then
         log_error 'Update file not found.'
@@ -366,11 +438,13 @@ elif [ "$1" == "update" ]; then
         mv cx-server cx-server.old
         mv cx-server.update cx-server
         chmod +x cx-server
-        echo "Successfully updated cx-server script."
+        log_info "Successfully updated cx-server script."
         exit 0;
     fi
-else
-    is_jenkins_running
+}
+
+function display_help()
+{
     echo ""
     echo "Usage: cx-server [COMMAND]"
     echo ""
@@ -383,5 +457,85 @@ else
     echo "   remove  Removes a stopped server container. A subsequent call of 'start' will instantiate a fresh container."
     echo "   update  Updates this script to its newest version from github."
     echo "   backup  Takes a backup of the ${jenkins_home} and stores it in a directory ${backup_directory}."
+    echo "   restore Restores the content of the ${jenkins_home} by the contents of the provided backup file. Usage cx-server restore <absolute_path_to_backup_file>"
+}
 
+function restore_volume()
+{
+    if [ -z "$1" ]; then
+        log_error "No argument supplied, restore requires a name of the backup file."
+        exit 1
+    fi
+    if [ ! -f "$1" ]; then
+        log_error "Backup file ${1} can not be read or does not exist."
+        exit 1
+    fi
+    local back_up_file="$1"
+    log_warn "Restore will stop the jenkins, delete content of ${jenkins_home} and restore it with ${back_up_file}\n Do you really want to continue?(yes/no)"
+    read answer
+    if [ "$answer" == "Y" ] || [ "$answer" == "y" ] || [ "$answer" == "YES" ] || [ "$answer" == "yes" ]; then
+        stop_jenkins
+        log_info "Starting to restore the state of the ${jenkins_home} from ${back_up_file}"
+        docker run -it -v $(pwd):/cx-server -v ${jenkins_home}:/volume -v ${back_up_file}:/backup/backup.tar.gz alpine sh -c "rm -rf /volume/* /volume/..?* /volume/.[!.]* && tar -C /volume/ -zxf /backup/backup.tar.gz && cp /volume/cx-server/server.cfg /cx-server/server.cfg && chmod u=rw,g=rw,o=rw /cx-server/server.cfg"
+        if [ $? -eq 0 ]; then
+            log_info "Restore completed"
+            remove_containers
+            log_info "Jenkins is stopped.\n Would you like to start it?(yes/no)"
+            read answer
+            if [ "$answer" == "Y" ] || [ "$answer" == "y" ] || [ "$answer" == "YES" ] || [ "$answer" == "yes" ]; then
+                read_configuration
+                start_jenkins
+            fi
+        else
+            log_error "There was an error restoring the backup"
+        fi
+    elif [ "$answer" == "N" ] || [ "$answer" == "n" ] || [ "$answer" == "NO" ] || [ "$answer" == "no" ]; then
+        log_info "Cancelling restore"
+    else
+        log_info "Invalid input"
+        exit 1
+    fi
+}
+
+function remove_containers()
+{
+    run docker rm "${container_name}"
+}
+
+function read_configuration()
+{
+    source server.cfg
+    if [ $? -ne 0 ]; then
+        log_error 'Failed to load config from server.cfg file.'
+        exit 1
+    fi
+}
+
+
+### Start of Script
+
+if is_update_available; then
+        echo ""
+        echo -e "\033[1mPlease run 'cx-server update' to update this script to its newest version.\033[0m"
+        echo ""
+fi
+
+read_configuration
+
+# ensure that docker is installed
+command -v docker > /dev/null 2>&1 || { echo >&2 "Docker does not seem to be installed. Please install docker and ensure that the docker command is included in \$PATH."; exit 1; }
+if [ "$1" == "backup" ]; then
+    backup_volume
+elif [ "$1" == "restore" ]; then
+    restore_volume "$2"
+elif [ "$1" == "start" ]; then
+    start_jenkins
+elif [ "$1" == "stop" ]; then
+    stop_jenkins
+elif [ "$1" == "remove" ]; then
+    run docker rm "${container_name}"
+elif [ "$1" == "update" ]; then
+    update_cx_server
+else
+    display_help
 fi
