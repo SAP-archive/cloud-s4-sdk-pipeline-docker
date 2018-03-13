@@ -334,6 +334,20 @@ function print_nexus_config()
 
 function start_nexus()
 {
+    cache_enabled=${cache_enabled=true}
+    if [ ${cache_enabled} = true ] ; then
+        if is_running "${nexus_container_name}" ; then
+            stop_nexus
+        fi
+        run docker network create "${network_name}"
+        start_nexus_container
+    else
+        echo "Download cache disabled."
+    fi
+}
+
+function start_nexus_container()
+{
     # check if exited and start if yes
     if is_container_status "${nexus_container_name}" 'exited'; then
         echo "Nexus container was stopped. Restarting stopped instance..."
@@ -509,7 +523,7 @@ function start_jenkins_container()
         local environment_variable_parameter=()
         environment_variable_parameters+=("$(get_proxy_parameters "${image_name}")")
         environment_variable_parameters+=(${effective_java_opts})
-        mount_parameters="-v /var/run/docker.sock:/var/run/docker.sock -v ${jenkins_home}:/var/jenkins_home"
+        mount_parameters="-v $(pwd):/var/cx-server:ro -v /var/run/docker.sock:/var/run/docker.sock -v ${jenkins_home}:/var/jenkins_home"
 
         # start container
         run docker run ${user_parameter} --name "${container_name}" -d -p "${http_port}:8080" "${mount_parameters}" "${environment_variable_parameters[@]}" "${image_name}"
@@ -541,7 +555,8 @@ function backup_volume()
     # Backup can be taken when Jenkins server is up
     # https://wiki.jenkins.io/display/JENKINS/Administering+Jenkins
     log_info "Backup of ${jenkins_home} is in progress. It may take several minutes to complete."
-    docker run -it --rm --mount source=${backup_directory},target=/backup,type=bind -v ${jenkins_home}:/jenkins_home_volume -v $(pwd):/cx-server -w /cx-server alpine sh -c "tar czf /backup/${backup_file_name} -C /jenkins_home_volume . /cx-server/server.cfg && chmod u=rw,g=rw,o= /backup/${backup_file_name}"
+    docker run -it --rm --mount source=${backup_directory},target=/backup,type=bind -v ${jenkins_home}:/jenkins_home_volume -v $(pwd):/cx-server -w /cx-server alpine sh -c "cp -pr /jenkins_home_volume /cx-server/backup && tar czf /backup/${backup_file_name} -C /jenkins_home_volume . /cx-server/server.cfg &&\
+                                                                                                                                                chmod u=rw,g=rw,o= /backup/${backup_file_name} && rm -rf /cx-server/backup"
     if [ $? -ne "0" ]; then
         log_error "Failed to backup ${jenkins_home}."
         exit $?;
@@ -568,6 +583,9 @@ function update_cx_server()
 
 function display_help()
 {
+    if [ ! -z "$1" ]; then
+        echo "'cx-server $1', unknown command"
+    fi
     echo ""
     echo "Usage: cx-server [COMMAND]"
     echo ""
@@ -642,7 +660,6 @@ function read_configuration()
 }
 
 
-
 ### Start of Script
 
 if is_update_available; then
@@ -660,34 +677,20 @@ if [ "$1" == "backup" ]; then
 elif [ "$1" == "restore" ]; then
     restore_volume "$2"
 elif [ "$1" == "start" ]; then
-    run docker network create "${network_name}"
-    cache_enabled=${cache_enabled=true}
-    if [ ${cache_enabled} = true ] ; then
-        if ! is_running "${nexus_container_name}" ; then
-            start_nexus
-        else
-            log_info "Download cache is already running."
-        fi
-    else
-        echo "Download cache disabled."
-    fi
-
+    start_nexus
     start_jenkins
-
 elif [ "$1" == "stop" ]; then
     stop_jenkins
-    nexus_container_id="$(get_container_id "${nexus_container_name}")"
-    if [ -z "${nexus_container_id}" ]; then
-        log_info "The cache server is not running."
-    else
-        echo 'Stopping nexus'
-        run docker stop "${nexus_container_name}"
-    fi
+    stop_nexus
+elif [ "$1" == "start_cache" ]; then
+    start_nexus
+elif [ "$1" == "stop_cache" ]; then
+    stop_nexus
 elif [ "$1" == "remove" ]; then
     remove_containers
     remove_networks
 elif [ "$1" == "update" ]; then
     update_cx_server
 else
-    display_help
+    display_help "$1"
 fi
