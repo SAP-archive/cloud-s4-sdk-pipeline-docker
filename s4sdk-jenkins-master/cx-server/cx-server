@@ -5,6 +5,9 @@ script_url='https://raw.githubusercontent.com/SAP/cloud-s4-sdk-pipeline-docker/m
 container_name='s4sdk-jenkins-master'
 backup_directory="$(pwd)/backup"
 backup_file_name="jenkins_home_$(date -u +%Y-%m-%dT%H%M%Z).tar.gz"
+nexus_container_name='s4sdk-nexus'
+cache_docker_image='sonatype/nexus3:3.8.0'
+network_name='s4sdk-network'
 
 function log_error()
 {
@@ -263,6 +266,18 @@ function stop_jenkins_container()
     retry 360 5 0 "is_container_status ${container_name} 'exited'"
 }
 
+function stop_nexus()
+{
+    nexus_container_id="$(get_container_id "${nexus_container_name}")"
+    if [ -z "${nexus_container_id}" ]; then
+        log_info "The cache server is not running."
+    else
+        echo 'Stopping nexus'
+        run docker stop "${nexus_container_name}"
+        remove_networks
+    fi
+}
+
 function get_image_environment_variable()
 {
     cmd='echo $'"${2}"
@@ -291,6 +306,7 @@ function print_proxy_config()
     fi
 
 }
+
 function print_jenkins_config()
 {
     echo "   - jenkins_home=${jenkins_home}"
@@ -298,6 +314,113 @@ function print_jenkins_config()
         echo "   - x_java_opts=${x_java_opts}"
     fi
     print_proxy_config
+}
+
+function print_nexus_config()
+{
+    echo "Starting docker container for download cache server."
+    echo "Parameters:"
+    if [ ! -z "${mvn_repository_url}" ]; then
+        echo "   - mvn_repository_url=${mvn_repository_url}"
+    fi
+    if [ ! -z "${npm_registry_url}" ]; then
+        echo "   - npm_registry_url=${npm_registry_url}"
+    fi
+    if [ ! -z "${x_nexus_java_opts}" ]; then
+        echo "   - x_nexus_java_opts=${x_nexus_java_opts}"
+    fi
+    print_proxy_config
+}
+
+function start_nexus()
+{
+    # check if exited and start if yes
+    if is_container_status "${nexus_container_name}" 'exited'; then
+        echo "Nexus container was stopped. Restarting stopped instance..."
+        run docker start "${nexus_container_name}"
+        if [ $? -ne "0" ]; then
+            log_error "Failed to start existing nexus container."
+            exit $?;
+        fi
+    else
+        run docker pull "${cache_docker_image}"
+        if [ $? -ne "0" ]; then
+            log_error "Failed to pull ${cache_docker_image}."
+            exit $?;
+        fi
+
+        local environment_variable_parameters=()
+        if [ ! -z "${x_nexus_java_opts}" ]; then
+            local container_java_opts="$(get_image_environment_variable ${cache_docker_image} INSTALL4J_ADD_VM_PARAMS)"
+            local effective_java_opts="-e INSTALL4J_ADD_VM_PARAMS=\""${container_java_opts}" "${x_nexus_java_opts}"\""
+        fi
+        environment_variable_parameters+="$(get_proxy_parameters "${cache_docker_image}")"
+        environment_variable_parameters+="${effective_java_opts}"
+
+        print_nexus_config
+
+        run docker run --name "${nexus_container_name}" --rm --network="${network_name}" -d "${environment_variable_parameters[@]}" "${cache_docker_image}"
+        if [ $? -ne "0" ]; then
+            log_error "Failed to start new nexus container."
+            exit $?;
+        fi
+    fi
+
+    wait_for_nexus_started
+    init_nexus
+}
+
+function wait_for_nexus_started()
+{
+    echo -n "Waiting for the nexus server to start"
+    retry 120 1 0 docker exec "${nexus_container_name}" curl -s -X GET http://localhost:8081/service/rest/v1/script -H \'Authorization: Basic YWRtaW46YWRtaW4xMjM=\' -H \'Content-Type: application/json\'
+}
+
+function init_nexus()
+{
+    if [ -z "${mvn_repository_url}" ]; then
+        mvn_repository_url='https://repo.maven.apache.org/maven2/'
+    fi
+    if [ -z "${npm_registry_url}" ]; then
+        npm_registry_url='https://registry.npmjs.org/'
+    fi
+
+    nexus_init_script="synchronized(this) {\\n    def result = [created: [], deleted: []]\\n\\n    def repoManager = repository.repositoryManager\\n    def existingRepoNames = repoManager.browse().collect { repo -> repo.name }\\n\\n    def mvnProxyName = 'mvn-proxy'\\n    if (!existingRepoNames.contains(mvnProxyName)) {\\n        repository.createMavenProxy(mvnProxyName, '${mvn_repository_url}')\\n        result.created.add(mvnProxyName)\\n    }\\n    def npmProxyName = 'npm-proxy'\\n    if (!existingRepoNames.contains(npmProxyName)) {\\n        repository.createNpmProxy(npmProxyName, '${npm_registry_url}')\\n        result.created.add(npmProxyName)\\n    }\\n\\n    def proxyRepos = [ npmProxyName, mvnProxyName ]\\n    def toDelete = existingRepoNames.findAll { !proxyRepos.contains(it) }\\n\\n    for(def repoName : toDelete) {\\n        repoManager.delete(repoName)\\n        result.deleted.add(repoName)\\n    }\\n\\n    return result\\n}\\n"
+
+    echo "Initializing Nexus"
+
+    local script_get_httpcode=$(docker exec "${nexus_container_name}" curl -s -w '%{http_code}' -o /dev/null -X GET http://localhost:8081/service/rest/v1/script/init-repos \
+      -H 'Authorization: Basic YWRtaW46YWRtaW4xMjM=' \
+      -H 'Content-Type: application/json')
+
+    if [ "${script_get_httpcode}" != "200" ]; then
+        echo -n "Creating nexus init script... "
+        local script_post_httpcode=$(docker exec "${nexus_container_name}" curl -s -w '%{http_code}\n' -X POST http://localhost:8081/service/rest/v1/script \
+            -H 'Authorization: Basic YWRtaW46YWRtaW4xMjM=' \
+            -H 'Content-Type: application/json' \
+            -d "{ \"name\": \"init-repos\", \"type\": \"groovy\", \"content\": \"${nexus_init_script}\" }")
+        if [ "${script_post_httpcode}" == "204" ]; then
+            echo "success."
+        else
+            echo "failed with http code ${script_post_httpcode}"
+        fi
+    else
+        echo -n "Updating nexus init script... "
+        local script_put_httpcode=$(docker exec "${nexus_container_name}" curl -s -w '%{http_code}\n' -X PUT http://localhost:8081/service/rest/v1/script/init-repos \
+            -H 'Authorization: Basic YWRtaW46YWRtaW4xMjM=' \
+            -H 'Content-Type: application/json' \
+            -d "{ \"name\": \"init-repos\", \"type\": \"groovy\", \"content\": \"${nexus_init_script}\" }")
+
+        if [ "${script_put_httpcode}" == "204" ]; then
+            echo "success."
+        else
+            echo "failed with http code ${script_put_httpcode}"
+        fi
+    fi
+
+    docker exec "${nexus_container_name}" curl -s -w 'HTTP: %{http_code}\n' -X POST http://localhost:8081/service/rest/v1/script/init-repos/run \
+      -H 'Authorization: Basic YWRtaW46YWRtaW4xMjM=' \
+      -H 'Content-Type: text/plain'
 }
 
 function start_jenkins()
@@ -502,6 +625,13 @@ function remove_containers()
     run docker rm "${container_name}"
 }
 
+function remove_networks()
+{
+    if [ $(docker network ls|grep -c ${network_name}) -gt 0 ]; then
+        run docker network remove "${network_name}"
+    fi
+}
+
 function read_configuration()
 {
     source server.cfg
@@ -510,6 +640,7 @@ function read_configuration()
         exit 1
     fi
 }
+
 
 
 ### Start of Script
@@ -529,11 +660,32 @@ if [ "$1" == "backup" ]; then
 elif [ "$1" == "restore" ]; then
     restore_volume "$2"
 elif [ "$1" == "start" ]; then
+    run docker network create "${network_name}"
+    cache_enabled=${cache_enabled=true}
+    if [ ${cache_enabled} = true ] ; then
+        if ! is_running "${nexus_container_name}" ; then
+            start_nexus
+        else
+            log_info "Download cache is already running."
+        fi
+    else
+        echo "Download cache disabled."
+    fi
+
     start_jenkins
+
 elif [ "$1" == "stop" ]; then
     stop_jenkins
+    nexus_container_id="$(get_container_id "${nexus_container_name}")"
+    if [ -z "${nexus_container_id}" ]; then
+        log_info "The cache server is not running."
+    else
+        echo 'Stopping nexus'
+        run docker stop "${nexus_container_name}"
+    fi
 elif [ "$1" == "remove" ]; then
-    run docker rm "${container_name}"
+    remove_containers
+    remove_networks
 elif [ "$1" == "update" ]; then
     update_cx_server
 else
