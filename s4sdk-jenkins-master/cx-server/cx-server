@@ -470,7 +470,7 @@ function start_jenkins_container()
 
             image_name="s4sdk/jenkins-master-customized"
 
-            run "docker build -t ${image_name} ${customDockerfileDir}"
+            run "docker build --pull -t ${image_name} ${customDockerfileDir}"
             if [ $? -ne "0" ]; then
                 log_error "Failed to build custom Dockerfile."
                 exit $?;
@@ -493,14 +493,13 @@ function start_jenkins_container()
             else
                 image_name="${docker_image}"
             fi
+            run "docker pull ${image_name}"
+            if [ $? -ne "0" ]; then
+                log_error "Failed to pull '$image_name'."
+                exit $?;
+            fi
         fi
-        run "docker pull ${image_name}"
-        if [ $? -ne "0" ]; then
-            log_error "Failed to pull '$image_name'."
-            exit $?;
-        fi
-
-         # determine docker gid
+        # determine docker gid
         docker_gid=$(grep "^docker" /etc/group|cut -d: -f3)
 
         if [ -z "${docker_gid}" ]; then
