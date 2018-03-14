@@ -555,11 +555,15 @@ function backup_volume()
     # Backup can be taken when Jenkins server is up
     # https://wiki.jenkins.io/display/JENKINS/Administering+Jenkins
     log_info "Backup of ${jenkins_home} is in progress. It may take several minutes to complete."
-    docker run -it --rm --mount source=${backup_directory},target=/backup,type=bind -v ${jenkins_home}:/jenkins_home_volume -v $(pwd):/cx-server -w /cx-server alpine sh -c "cp -pr /jenkins_home_volume /cx-server/backup && tar czf /backup/${backup_file_name} -C /jenkins_home_volume . /cx-server/server.cfg &&\
-                                                                                                                                                chmod u=rw,g=rw,o= /backup/${backup_file_name} && rm -rf /cx-server/backup"
-    if [ $? -ne "0" ]; then
-        log_error "Failed to backup ${jenkins_home}."
-        exit $?;
+    docker run -it --rm --mount source=${backup_directory},target=/backup,type=bind -v ${jenkins_home}:/jenkins_home -v $(pwd):/cx-server:ro -w /cx-server alpine sh -c "mkdir -p /backup/temp/ && \
+                                                                                                                                                                      rm -rf /backup/temp/ && \
+                                                                                                                                                                      cp -pr /jenkins_home /backup/temp/ && \
+                                                                                                                                                                      tar czf /backup/${backup_file_name} -C /backup/temp/ . /cx-server/server.cfg &&\
+                                                                                                                                                                      chmod u=rw,g=rw,o= /backup/${backup_file_name} && \
+                                                                                                                                                                      rm -rf /backup/temp/"
+    if [ $? -ne "0" ] || [ ! -f ${backup_directory}/${backup_file_name} ]; then
+        log_error "Failed to take a backup of ${jenkins_home}."
+        exit 1;
     fi
     log_info "Backup is completed and available at ${backup_directory} directory. File name is ${backup_file_name}"
     log_info "Please note, this backup contains sensitive information."
