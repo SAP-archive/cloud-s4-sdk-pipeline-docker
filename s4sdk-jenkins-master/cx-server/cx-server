@@ -171,6 +171,10 @@ function get_proxy_parameters()
         # append to whatever is there
         no_proxy_values+=("${x_no_proxy}")
     fi
+    
+    if [ "${behind_proxy}" = true ]; then	
+        no_proxy_values+=("${nexus_container_name}")	
+    fi
 
     if [ ${#no_proxy_values[@]} != 0 ]; then
         local no_proxy_values_string="$(join , "${no_proxy_values[@]}")"
