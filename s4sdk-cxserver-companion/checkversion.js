@@ -68,8 +68,8 @@ function sortNumberDescending(a, b) {
  */
 function parseDockerImageInfo(strDockerImage) {
     // image string might contain docker registry url
-    const match = strDockerImage.match(/\//g);
-    if (!match || (match.length > 1)) {
+    const urlMatch = strDockerImage.match(/\//g);
+    if (!urlMatch || (urlMatch.length > 1)) {
         exit(`Invalid image name: '${strDockerImage}'. Expected format: 's4sdk/jenkins-master:tag'`, RETURN_CODES.INVALID_IMAGE_NAME);
     }
 
