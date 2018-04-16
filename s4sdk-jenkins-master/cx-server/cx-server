@@ -7,7 +7,12 @@ backup_directory="$(pwd)/backup"
 backup_file_name="jenkins_home_$(date -u +%Y-%m-%dT%H%M%Z).tar.gz"
 nexus_container_name='s4sdk-nexus'
 cache_docker_image='sonatype/nexus3:3.8.0'
+cxserver_companion_docker_image='s4sdk/cxserver-companion'
+
 network_name='s4sdk-network'
+
+bold_start="\033[1m"
+bold_end="\033[0m"
 
 function log_error()
 {
@@ -143,7 +148,7 @@ function get_proxy_parameters()
     local image_no_proxy=$(get_image_environment_variable "${image_name}" no_proxy)
 
     if [ ! -z "${http_proxy}" ]; then
-        proxy_params+=("-e HTTP_PROXY='${http_proxy}' -e http_proxy='${http_proxy}'")
+        proxy_params+=(-e HTTP_PROXY="${http_proxy}" -e http_proxy="${http_proxy}")
         behind_proxy=true
     elif [ ! -z "${image_http_proxy}" ]; then
         behind_proxy=true
@@ -151,7 +156,7 @@ function get_proxy_parameters()
 
 
     if [ ! -z "${https_proxy}" ]; then
-        proxy_params+=("-e HTTPS_PROXY='${https_proxy}' -e https_proxy='${https_proxy}'")
+        proxy_params+=(-e HTTPS_PROXY="${https_proxy}" -e https_proxy="${https_proxy}")
         behind_proxy=true
     elif [ ! -z "${image_https_proxy}" ]; then
         behind_proxy=true
@@ -178,7 +183,7 @@ function get_proxy_parameters()
 
     if [ ${#no_proxy_values[@]} != 0 ]; then
         local no_proxy_values_string="$(join , "${no_proxy_values[@]}")"
-        proxy_params+=("-e NO_PROXY='${no_proxy_values_string}' -e no_proxy='${no_proxy_values_string}'")
+        proxy_params+=(-e NO_PROXY="${no_proxy_values_string}" -e no_proxy="${no_proxy_values_string}")
     fi
 
     local dbg_info=()
@@ -286,7 +291,7 @@ function get_image_environment_variable()
 {
     cmd='echo $'"${2}"
 
-    env_value="$(docker run --rm --entrypoint /bin/bash "${1}" -c "${cmd}")"
+    env_value="$(docker run --rm --entrypoint /bin/sh "${1}" -c "${cmd}")"
     if [ $? -ne 0 ]; then
         log_error "Failed to extract environment variable '${2}' from image '${1}'"
         exit 1
@@ -561,12 +566,15 @@ function backup_volume()
     # Backup can be taken when Jenkins server is up
     # https://wiki.jenkins.io/display/JENKINS/Administering+Jenkins
     log_info "Backup of ${jenkins_home} is in progress. It may take several minutes to complete."
-    docker run -it --rm --mount source=${backup_directory},target=/backup,type=bind -v ${jenkins_home}:/jenkins_home -v $(pwd):/cx-server:ro -w /cx-server alpine sh -c "mkdir -p /backup/temp/ && \
-                                                                                                                                                                      rm -rf /backup/temp/ && \
-                                                                                                                                                                      cp -pr /jenkins_home /backup/temp/ && \
-                                                                                                                                                                      tar czf /backup/${backup_file_name} -C /backup/temp/ . /cx-server/server.cfg &&\
-                                                                                                                                                                      chmod u=rw,g=rw,o= /backup/${backup_file_name} && \
-                                                                                                                                                                      rm -rf /backup/temp/"
+    docker run -it --rm \
+        --mount source=${backup_directory},target=/backup,type=bind \
+        -v ${jenkins_home}:/jenkins_home -v $(pwd):/cx-server:ro -w /cx-server \
+        alpine sh -c "mkdir -p /backup/temp/ && \
+            rm -rf /backup/temp/ && \
+            cp -pr /jenkins_home /backup/temp/ && \
+            tar czf /backup/${backup_file_name} -C /backup/temp/ . /cx-server/server.cfg &&\
+            chmod u=rw,g=rw,o= /backup/${backup_file_name} && \
+            rm -rf /backup/temp/"
     if [ $? -ne "0" ] || [ ! -f ${backup_directory}/${backup_file_name} ]; then
         log_error "Failed to take a backup of ${jenkins_home}."
         exit 1;
@@ -591,6 +599,12 @@ function update_cx_server()
     fi
 }
 
+function command_help_text()
+{
+    # 14 is the field width of the command name column
+    printf "  ${bold_start}%-14s${bold_end} %s\n" "${1}" "${2}"
+}
+
 function display_help()
 {
     if [ ! -z "$1" ]; then
@@ -603,12 +617,13 @@ function display_help()
     echo "Use server.cfg for customizing parameters."
     echo ""
     echo "Commands:"
-    echo "   start   Starts the server container using the configured parameters for jenkins_home, docker_registry, docker_image, http_port."
-    echo "   stop    Stops the running server container."
-    echo "   remove  Removes a stopped server container. A subsequent call of 'start' will instantiate a fresh container."
-    echo "   update  Updates this script to its newest version from github."
-    echo "   backup  Takes a backup of the ${jenkins_home} and stores it in a directory ${backup_directory}."
-    echo "   restore Restores the content of the ${jenkins_home} by the contents of the provided backup file. Usage cx-server restore <absolute_path_to_backup_file>"
+    command_help_text 'start'         'Starts the server container using the configured parameters for jenkins_home, docker_registry, docker_image, http_port.'
+    command_help_text 'stop'          'Stops the running server container.'
+    command_help_text 'remove'        "Removes a stopped server container. A subsequent call of 'start' will instantiate a fresh container."
+    command_help_text 'backup'        "Takes a backup of the configured 'jenkins_home' and stores it in the configured 'backup_directory'."
+    command_help_text 'restore'       "Restores the content of the configured 'jenkins_home' by the contents of the provided backup file. Usage: 'cx-server restore <absolute_path_to_backup_file>'."
+    command_help_text 'update script' 'Updates this script to its newest version from GitHub.'
+    command_help_text 'update image'  "Updates the configured 'docker_image' to the newest available version of Cx Server image on Docker Hub."
 }
 
 function restore_volume()
@@ -669,27 +684,100 @@ function read_configuration()
     fi
 }
 
+function check_script_update()
+{
+    if is_update_available; then
+        echo ""
+        echo -e "\033[1mPlease run 'cx-server update script' to update this script to its newest version.\033[0m"
+        echo ""
+    fi
+}
+
+function check_image_update()
+{
+    docker pull "${cxserver_companion_docker_image}"
+    echo -n "Checking for new version of Cx Server Docker image... "
+
+    local return_code
+    local stdout
+
+    if [ ! -z ${docker_registry} ]; then
+        echo "skipping update check because custom docker registry is used."
+    else
+        local proxy_params=$(get_proxy_parameters "${cxserver_companion_docker_image}")
+        stdout="$(docker run ${proxy_params[*]} "${cxserver_companion_docker_image}" node /cx-server/checkversion.js "${docker_image}")"
+        return_code=$?
+
+        if [ ${return_code} -eq 0 ]; then
+            echo "'${docker_image}' is up to date."
+        elif [ ${return_code} -eq 3 ]; then
+            echo "newer version available: '${stdout}' (current version '${docker_image}')."
+            echo -e "${bold_start}Please run 'cx-server update image' to update this script to its newest version.${bold_end}"
+        else
+            log_warn "check returned with error code (${return_code}). Error message: '${stdout}'."
+        fi
+    fi
+}
+
+function update_image()
+{
+    docker pull "${cxserver_companion_docker_image}"
+    if [ ! -z ${docker_registry} ]; then
+        log_error "You are using a custom docker registry. Automated updating is only supported for Docker Hub. Please perform a manual update."
+        exit 1
+    fi
+
+    echo "Checking for newest version of Cx Server Docker image... "
+
+    local newimagecmd_return_code
+    local newimagecmd_stdout
+
+    local proxy_params=$(get_proxy_parameters "${cxserver_companion_docker_image}")
+    newimagecmd_stdout="$(docker run ${proxy_params[*]} "${cxserver_companion_docker_image}" node /cx-server/checkversion.js "${docker_image}")"
+    newimagecmd_return_code=$?
+
+    if [ ${newimagecmd_return_code} -eq 0 ]; then
+        echo "Your current version '${docker_image}' is up to date."
+    elif [ ${newimagecmd_return_code} -eq 3 ]; then
+        echo "Newer version detected. Updating to '${newimagecmd_stdout}'."
+
+        local replaceimgcmd_returncode
+        local replaceimagecmd_stdout
+        replaceimagecmd_stdout=$(docker run -v $PWD:/input "${cxserver_companion_docker_image}" node updateversion.js "${docker_image}" "${newimagecmd_stdout}")
+        replaceimgcmd_returncode=$?
+
+        if [ ${replaceimgcmd_returncode} -eq 0 ]; then
+            echo "Success: ${replaceimagecmd_stdout}"
+        else
+            log_error "${replaceimagecmd_stdout}"
+            exit ${replaceimgcmd_returncode}
+        fi
+
+    else
+        log_error "Check returned with error code (${newimagecmd_return_code}). Error message: '${newimagecmd_stdout}'."
+    fi
+}
 
 ### Start of Script
-
-if is_update_available; then
-        echo ""
-        echo -e "\033[1mPlease run 'cx-server update' to update this script to its newest version.\033[0m"
-        echo ""
-fi
-
 read_configuration
 
 # ensure that docker is installed
 command -v docker > /dev/null 2>&1 || { echo >&2 "Docker does not seem to be installed. Please install docker and ensure that the docker command is included in \$PATH."; exit 1; }
+
 if [ "$1" == "backup" ]; then
+    check_script_update
     backup_volume
 elif [ "$1" == "restore" ]; then
+    check_script_update
     restore_volume "$2"
 elif [ "$1" == "start" ]; then
+    check_script_update
+    check_image_update
     start_nexus
     start_jenkins
 elif [ "$1" == "stop" ]; then
+    check_script_update
+    check_image_update
     stop_jenkins
     stop_nexus
 elif [ "$1" == "start_cache" ]; then
@@ -697,10 +785,25 @@ elif [ "$1" == "start_cache" ]; then
 elif [ "$1" == "stop_cache" ]; then
     stop_nexus
 elif [ "$1" == "remove" ]; then
+    check_script_update
     remove_containers
     remove_networks
 elif [ "$1" == "update" ]; then
-    update_cx_server
+    if [ "$2" == "script" ]; then
+        update_cx_server
+    elif [ "$2" == "image" ]; then
+        stop_nexus
+        stop_jenkins
+        remove_containers
+        remove_networks
+        backup_volume
+        update_image
+        start_nexus
+        start_jenkins
+    else
+        log_error "Missing qualifier. Please specify a update qualifier. Execute 'cx-server' for more information."
+    fi
 else
+    check_script_update
     display_help "$1"
 fi
