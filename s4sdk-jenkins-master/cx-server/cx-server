@@ -798,6 +798,7 @@ elif [ "$1" == "update" ]; then
         remove_networks
         backup_volume
         update_image
+        read_configuration
         start_nexus
         start_jenkins
     else
