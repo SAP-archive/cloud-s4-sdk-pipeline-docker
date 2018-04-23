@@ -712,7 +712,7 @@ function check_image_update()
             echo "'${docker_image}' is up to date."
         elif [ ${return_code} -eq 3 ]; then
             echo "newer version available: '${stdout}' (current version '${docker_image}')."
-            echo -e "${bold_start}Please run 'cx-server update image' to update this script to its newest version.${bold_end}"
+            echo -e "${bold_start}Please run 'cx-server update image' to update Cx Server Docker image to its newest version.${bold_end}"
         else
             log_warn "check returned with error code (${return_code}). Error message: '${stdout}'."
         fi
