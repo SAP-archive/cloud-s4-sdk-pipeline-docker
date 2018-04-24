@@ -14,4 +14,5 @@ def dockerImages = [
 
 node {
   buildDockerImages(dockerImages)
+  cleanUpDocker script:this, excludeImages: ['s4sdk-nexus','s4sdk-jenkins-master'], forceContainerRemoval: 1, forceImageRemoval: 1, gracePeriodSeconds: 10
 }
