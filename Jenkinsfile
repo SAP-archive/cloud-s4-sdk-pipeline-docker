@@ -3,6 +3,7 @@
 @Library(['pipelines-testing-lib'])
 
 def dockerImages = [
+  ['folder': 's4sdk-cxserver-companion', 'name': 's4sdk/cxserver-companion'],
   ['folder': 's4sdk-docker-cf-cli', 'name': 's4sdk/docker-cf-cli'],
   ['folder': 's4sdk-docker-neo-cli', 'name': 's4sdk/docker-neo-cli'],
   ['folder': 's4sdk-docker-node-browsers', 'name': 's4sdk/docker-node-browsers'],
@@ -12,5 +13,9 @@ def dockerImages = [
 ]
 
 node {
-  buildDockerImages(dockerImages)
+try{
+    buildDockerImages(dockerImages)
+  } finally{
+     cleanUpDocker script:this, excludeImages: ['s4sdk-nexus','s4sdk-jenkins-master'], forceContainerRemoval: 1, forceImageRemoval: 1, gracePeriodSeconds: 10
+  }
 }

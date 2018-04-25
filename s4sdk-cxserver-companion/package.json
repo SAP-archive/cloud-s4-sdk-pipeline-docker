@@ -1,0 +1,10 @@
+{
+  "name": "cxserver-companion",
+  "description": "The cx-server companion provides functionality which is used within the cx-server script.",
+  "license": "Apache-2.0",
+  "repository": "https://github.com/SAP/cloud-s4-sdk-pipeline-docker",
+  "dependencies": {
+    "request": "~2.85.0",
+    "escape-string-regexp": "~1.0.5"
+  }
+}
