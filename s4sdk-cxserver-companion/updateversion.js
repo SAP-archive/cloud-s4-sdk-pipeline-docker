@@ -2,11 +2,8 @@
 'use strict';
 
 /***
- * IMPORTANT! As long as the cx-server script and this companion do not support version alignment,
- * the contract of all exposed functionality is never allowed to change.
- *
- * This script consumes an old value and new value for the config pararmeter docker_image.
- * It then updates all occurences in the provided server.cfg file.
+ * This script consumes an old value and new value for the config parameter docker_image.
+ * It then updates all occurrences in the provided server.cfg file.
  */
 
 const fs = require('fs');
@@ -32,7 +29,7 @@ const newImage = process.argv[3];
 
 const matches = [];
 
-const serverCfgPath = '/input/server.cfg';
+const serverCfgPath = '/cx-server/mount/server.cfg';
 fs.readFile(serverCfgPath, 'utf8', function (err, data) {
     if (err) {
         exit("Failed to read server.cfg file")
