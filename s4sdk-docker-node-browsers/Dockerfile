@@ -7,3 +7,5 @@ RUN apt-get update && \
 RUN ln -s /usr/bin/chromium /usr/bin/google-chrome
 
 RUN npm config set @sap:registry https://npm.sap.com
+
+USER node
