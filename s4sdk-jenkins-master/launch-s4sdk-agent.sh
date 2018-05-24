@@ -67,7 +67,7 @@ $SSH_COMMAND $SSH_USER@$SSH_HOST "mkdir -p $REMOTE_DIR/cx-server" </dev/null
 $SCP_COMMAND /var/cx-server/cx-server $SSH_USER@$SSH_HOST:"$REMOTE_DIR"/cx-server/cx-server
 $SCP_COMMAND /var/cx-server/server.cfg $SSH_USER@$SSH_HOST:"$REMOTE_DIR"/cx-server/server.cfg
 
-$SSH_COMMAND -tt $SSH_USER@$SSH_HOST "cd $REMOTE_DIR/cx-server; ./cx-server start_cache"</dev/null >/dev/null
+$SSH_COMMAND $SSH_USER@$SSH_HOST "cd $REMOTE_DIR/cx-server; ./cx-server start_cache"</dev/null >/dev/null
 
 echo "Start agent"
 $SSH_COMMAND $SSH_USER@$SSH_HOST docker run -i --rm --log-driver none -u 1000:$DOCKER_GID -v \`pwd\`/$REMOTE_DIR:/$REMOTE_DIR -v /var/run/docker.sock:/var/run/docker.sock $PROXY_ENV $DOCKER_IMAGE java -jar /$REMOTE_DIR/slave.jar
