@@ -1,7 +1,5 @@
 #!/bin/bash
 
-readonly script_url='https://raw.githubusercontent.com/SAP/cloud-s4-sdk-pipeline-docker/master/s4sdk-jenkins-master/cx-server/cx-server'
-
 container_name='s4sdk-jenkins-master'
 backup_file_name="jenkins_home_$(date -u +%Y-%m-%dT%H%M%Z).tar.gz"
 nexus_container_name='s4sdk-nexus'
@@ -695,37 +693,35 @@ function update_image()
 
 function update_cx_server_script()
 {
-    newest_version="$(curl --max-time 10 --silent --fail ${script_url})"
-    if [ $? -ne 0 ]; then
+    # Bash
+    if [ ! -f '/cx-server/cx-server' ]; then
         echo ""
-        log_error 'Failed to check for new version of this script for Bash.'
-        return 1
+        log_error 'Failed to read newes cx-server version for Bash.'
     fi
+    newest_version="$(</cx-server/cx-server)"
 
     if [ ! -f '/cx-server/mount/cx-server' ]; then
         echo ""
         log_error 'Failed to read current cx-server version for Bash.'
     fi
     this_version="$(</cx-server/mount/cx-server)"
-
     if [ "${this_version}" != "${newest_version}" ]; then
         echo " detected newer version. Applying update."
         echo "${newest_version}" > '/cx-server/mount/cx-server'
     fi
 
-    newest_version_bat="$(curl --max-time 10 --silent --fail ${script_url}.bat)"
-    if [ $? -ne 0 ]; then
+    # Windows
+    if [ ! -f '/cx-server/cx-server.bat' ]; then
         echo ""
-        log_error 'Failed to check for new version of this script for Windows.'
-        return 1
+        log_error 'Failed to read newes cx-server version for Windows.'
     fi
+    newest_version_bat="$(</cx-server/cx-server.bat)"
 
     if [ ! -f '/cx-server/mount/cx-server.bat' ]; then
         echo ""
         log_error 'Failed to read current cx-server version for Windows.'
     fi
     this_version_bat="$(</cx-server/mount/cx-server.bat)"
-
     if [ "${this_version_bat}" != "${newest_version_bat}" ]; then
         echo " detected newer version for Windows. Applying update."
         echo "${newest_version_bat}" > '/cx-server/mount/cx-server.bat'

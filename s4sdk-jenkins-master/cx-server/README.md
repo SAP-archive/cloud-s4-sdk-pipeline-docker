@@ -9,8 +9,10 @@ When you make changes to `s4sdk-cxserver-companion/cx-server-companion.sh`, you 
 From this directory (`s4sdk-jenkins-master/cx-server`), the command to do so is:
 
 ```bash
-docker build -t s4sdk/cxserver-companion ../../s4sdk-cxserver-companion
+docker build [--build-arg cx_server_base_uri=https://github.some.domain/raw/path/to/cx-server] -t s4sdk/cxserver-companion ../../s4sdk-cxserver-companion
 ```
+
+The build argument `cx_server_base_uri` is optional and only required if you don't want to use the `cx-server` version from GitHub.com.
 
 Usually, when running `cx-server`, the companion image is automatically pulled from Docker Hub.
 This is designed for simple usage, but if you've built the image yourself, it will overwrite your changes.
