@@ -500,10 +500,20 @@ function start_jenkins_container()
         fi
         environment_variable_parameters+=("$(get_proxy_parameters "${image_name}")")
         environment_variable_parameters+=(${effective_java_opts})
-        mount_parameters="-v $(pwd):/var/cx-server:ro -v /var/run/docker.sock:/var/run/docker.sock -v ${jenkins_home}:/var/jenkins_home"
+
+        mount_parameters=()
+        mount_parameters+=("-v /var/run/docker.sock:/var/run/docker.sock")
+        mount_parameters+=("-v ${jenkins_home}:/var/jenkins_home")
+
+        if [ ! -z "${cx_server_path}" ]; then
+            if [ ${host_os} = 'windows' ] ; then
+                cx_server_path="//$(echo $cx_server_path | sed -e 's/://' -e 's/\\/\//g')"
+            fi
+            mount_parameters+=("-v $cx_server_path:/var/cx-server:ro")
+        fi
 
         # start container
-        run docker run ${user_parameter} --name "${container_name}" -d -p "${http_port}:8080" "${mount_parameters}" "${environment_variable_parameters[@]}" "${image_name}"
+        run docker run ${user_parameter} --name "${container_name}" -d -p "${http_port}:8080" "${mount_parameters[@]}" "${environment_variable_parameters[@]}" "${image_name}"
         if [ $? -ne "0" ]; then
             log_error "Failed to start new cx-server container."
             exit $?;
