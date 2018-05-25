@@ -696,7 +696,7 @@ function update_cx_server_script()
     # Bash
     if [ ! -f '/cx-server/cx-server' ]; then
         echo ""
-        log_error 'Failed to read newes cx-server version for Bash.'
+        log_error 'Failed to read newest cx-server version for Bash.'
     fi
     newest_version="$(</cx-server/cx-server)"
 
@@ -713,7 +713,7 @@ function update_cx_server_script()
     # Windows
     if [ ! -f '/cx-server/cx-server.bat' ]; then
         echo ""
-        log_error 'Failed to read newes cx-server version for Windows.'
+        log_error 'Failed to read newest cx-server version for Windows.'
     fi
     newest_version_bat="$(</cx-server/cx-server.bat)"
 
