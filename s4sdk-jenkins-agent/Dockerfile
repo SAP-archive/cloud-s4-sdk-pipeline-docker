@@ -4,18 +4,21 @@ ENV JENKINS_HOME /var/jenkins_home
   
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
-         apt-transport-https \
-         ca-certificates \
-         curl \
-         git \
-         gnupg \
-         openssh-client \
-         software-properties-common && \
-    curl -fsSL https://apt.dockerproject.org/gpg | apt-key add - && \
-    apt-key fingerprint 58118E89F3A912897C070ADBF76221572C52609D && \
-    add-apt-repository "deb https://apt.dockerproject.org/repo/ debian-$(lsb_release -cs) main" && \
+        git \
+        openssh-client \
+        apt-transport-https \
+        ca-certificates \
+        curl \
+        gnupg2 \
+        software-properties-common && \
+    curl -fsSL https://download.docker.com/linux/debian/gpg | apt-key add - && \
+    apt-key fingerprint 0EBFCD88 && \
+    add-apt-repository \
+       "deb [arch=amd64] https://download.docker.com/linux/debian \
+       $(lsb_release -cs) \
+       stable" && \
     apt-get update && \
-    apt-get -y install docker-engine && \
+    apt-get -y install docker-ce && \
     rm -rf /var/lib/apt/lists/* /var/cache/apt/*
 
 # add group & user

@@ -2,9 +2,6 @@
 'use strict';
 
 /***
- * IMPORTANT! As long as the cx-server script and this companion do not support version alignment,
- * the contract of all exposed functionality is never allowed to change.
- *
  * This script consumes a docker image name in the form of s4sdk/jenkins-master:v2 (where the tag is optional)
  * and checks whether a higher version is available on Docker Hub. If yes, it returns with exit code 3 and prints the
  * currently highest version to STDOUT. If the supplied value is the newest version, 0 is returned.
