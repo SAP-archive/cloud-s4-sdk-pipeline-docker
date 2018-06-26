@@ -18,6 +18,6 @@ node {
         buildDockerImages(dockerImages)
     } finally {
         final int GRACE_PERIOD_THREE_DAYS = 3600 * 24 * 3
-        cleanUpDocker script: this, excludeContainers: ['s4sdk-nexus', 's4sdk-jenkins-master'], forceContainerRemoval: 1, forceImageRemoval: 1, gracePeriodSeconds: GRACE_PERIOD_THREE_DAYS
+        cleanUpDocker script: this, excludeContainers: ['s4sdk-nexus', 's4sdk-jenkins-master', 'nexus'], forceContainerRemoval: 1, forceImageRemoval: 1, gracePeriodSeconds: GRACE_PERIOD_THREE_DAYS
     }
 }
