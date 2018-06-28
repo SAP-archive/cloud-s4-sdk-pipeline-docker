@@ -509,7 +509,7 @@ function start_jenkins_container()
             if [ ${host_os} = 'windows' ] ; then
                 cx_server_path="//$(echo $cx_server_path | sed -e 's/://' -e 's/\\/\//g')"
             fi
-            mount_parameters+=("-v $cx_server_path:/var/cx-server:ro")
+            mount_parameters+=("-v \"${cx_server_path}\":/var/cx-server:ro")
         fi
 
         # start container
