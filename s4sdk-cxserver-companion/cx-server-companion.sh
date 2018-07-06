@@ -3,7 +3,7 @@
 container_name='s4sdk-jenkins-master'
 backup_file_name="jenkins_home_$(date -u +%Y-%m-%dT%H%M%Z).tar.gz"
 nexus_container_name='s4sdk-nexus'
-cache_docker_image='sonatype/nexus3:3.8.0'
+cache_docker_image='sonatype/nexus3:3.12.1'
 cxserver_companion_docker_image='s4sdk/cxserver-companion'
 
 network_name='s4sdk-network'
