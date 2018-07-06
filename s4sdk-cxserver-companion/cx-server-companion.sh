@@ -346,7 +346,7 @@ function start_nexus_container()
         local environment_variable_parameters=()
         if [ ! -z "${x_nexus_java_opts}" ]; then
             local container_java_opts="$(get_image_environment_variable ${cache_docker_image} INSTALL4J_ADD_VM_PARAMS)"
-            local effective_java_opts="-e INSTALL4J_ADD_VM_PARAMS=\""${container_java_opts}" "${x_nexus_java_opts}"\""
+            local effective_java_opts=" -e INSTALL4J_ADD_VM_PARAMS=\""${container_java_opts}" "${x_nexus_java_opts}"\""
         fi
         environment_variable_parameters+="$(get_proxy_parameters "${cache_docker_image}")"
         environment_variable_parameters+="${effective_java_opts}"
