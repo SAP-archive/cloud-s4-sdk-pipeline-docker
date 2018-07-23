@@ -740,7 +740,20 @@ function update_cx_server_script()
     exit 0
 }
 
+function check_memory() {
+    # With too little memory, containers might get killed without any notice to the user.
+    # This is likely the case when running Docker on Windows or Mac, where a Virtual Machine is used which has 2 GiB memory by default.
+    # At least, we can indicate that memory might be an issue to the user.
+    # Depending on the workload, much more memory will be required.
+    memory=$(free -m | awk '/^Mem:/{print $2}');
+    # The "magic number" is an approximation based on setting the memory of the Linux VM to 4 GiB on Docker for Mac
+    if [ $memory -lt "3900" ]; then
+        log_warn "Low memory detected ($memory MiB). Please ensure Docker has at least 4 GiB of memory. Depending on the number of jobs running, much more memory might be required. On Windows and Mac, check how much memory Docker can use in \"Preferences\", \"Advanced\"."
+    fi
+}
+
 ### Start of Script
+check_memory
 read_configuration
 
 # ensure that docker is installed
