@@ -706,36 +706,41 @@ function update_cx_server_script()
     # Bash
     if [ ! -f '/cx-server/cx-server' ]; then
         echo ""
-        log_error 'Failed to read newest cx-server version for Bash.'
-    fi
-    newest_version="$(</cx-server/cx-server)"
+        log_error 'Failed to read newest cx-server version for Bash. Skipping update.'
+    else
+        newest_version="$(</cx-server/cx-server)"
 
-    if [ ! -f '/cx-server/mount/cx-server' ]; then
-        echo ""
-        log_error 'Failed to read current cx-server version for Bash.'
+        if [ ! -f '/cx-server/mount/cx-server' ]; then
+            echo ""
+            log_warn 'Failed to read current cx-server version for Bash. Updating to new version.'
+            echo "${newest_version}" > '/cx-server/mount/cx-server'
+        fi
+        this_version="$(</cx-server/mount/cx-server)"
+        if [ "${this_version}" != "${newest_version}" ]; then
+            echo " detected newer version. Applying update."
+            echo "${newest_version}" > '/cx-server/mount/cx-server'
+        fi
     fi
-    this_version="$(</cx-server/mount/cx-server)"
-    if [ "${this_version}" != "${newest_version}" ]; then
-        echo " detected newer version. Applying update."
-        echo "${newest_version}" > '/cx-server/mount/cx-server'
-    fi
+
 
     # Windows
     if [ ! -f '/cx-server/cx-server.bat' ]; then
         echo ""
-        log_error 'Failed to read newest cx-server version for Windows.'
-    fi
-    newest_version_bat="$(</cx-server/cx-server.bat)"
+        log_error 'Failed to read newest cx-server version for Windows. Skipping update.'
+    else
+        newest_version_bat="$(</cx-server/cx-server.bat)"
 
-    if [ ! -f '/cx-server/mount/cx-server.bat' ]; then
-        echo ""
-        log_error 'Failed to read current cx-server version for Windows.'
-    fi
-    this_version_bat="$(</cx-server/mount/cx-server.bat)"
-    if [ "${this_version_bat}" != "${newest_version_bat}" ]; then
-        echo " detected newer version for Windows. Applying update."
-        echo "${newest_version_bat}" > '/cx-server/mount/cx-server.bat'
-        unix2dos /cx-server/mount/cx-server.bat
+        if [ ! -f '/cx-server/mount/cx-server.bat' ]; then
+            echo ""
+            log_warn 'Failed to read current cx-server version for Windows. Updating to new version.'
+            echo "${newest_version_bat}" > '/cx-server/mount/cx-server.bat'
+        fi
+        this_version_bat="$(</cx-server/mount/cx-server.bat)"
+        if [ "${this_version_bat}" != "${newest_version_bat}" ]; then
+            echo " detected newer version for Windows. Applying update."
+            echo "${newest_version_bat}" > '/cx-server/mount/cx-server.bat'
+            unix2dos /cx-server/mount/cx-server.bat
+        fi
     fi
     exit 0
 }
