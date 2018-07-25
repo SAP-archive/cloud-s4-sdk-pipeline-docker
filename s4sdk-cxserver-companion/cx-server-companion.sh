@@ -372,6 +372,9 @@ function wait_for_nexus_started()
 
 function init_nexus()
 {
+    local my_container_id=$(head -n 1 /proc/self/cgroup | cut -d '/' -f3)
+    docker network connect s4sdk-network ${my_container_id}
+
     if [ -z "${mvn_repository_url}" ]; then
         mvn_repository_url='https://repo.maven.apache.org/maven2/'
     fi
@@ -379,42 +382,15 @@ function init_nexus()
         npm_registry_url='https://registry.npmjs.org/'
     fi
 
-    nexus_init_script="synchronized(this) {\\n    def result = [created: [], deleted: []]\\n\\n    def repoManager = repository.repositoryManager\\n    def existingRepoNames = repoManager.browse().collect { repo -> repo.name }\\n\\n    def mvnProxyName = 'mvn-proxy'\\n    if (!existingRepoNames.contains(mvnProxyName)) {\\n        repository.createMavenProxy(mvnProxyName, '${mvn_repository_url}')\\n        result.created.add(mvnProxyName)\\n    }\\n    def npmProxyName = 'npm-proxy'\\n    if (!existingRepoNames.contains(npmProxyName)) {\\n        repository.createNpmProxy(npmProxyName, '${npm_registry_url}')\\n        result.created.add(npmProxyName)\\n    }\\n\\n    def proxyRepos = [ npmProxyName, mvnProxyName ]\\n    def toDelete = existingRepoNames.findAll { !proxyRepos.contains(it) }\\n\\n    for(def repoName : toDelete) {\\n        repoManager.delete(repoName)\\n        result.deleted.add(repoName)\\n    }\\n\\n    return result\\n}\\n"
-
     echo "Initializing Nexus"
 
-    local script_get_httpcode=$(docker exec "${nexus_container_name}" curl --silent --write-out '%{http_code}' -o /dev/null -X GET http://localhost:8081/service/rest/v1/script/init-repos \
-      --header 'Authorization: Basic YWRtaW46YWRtaW4xMjM=' \
-      --header 'Content-Type: application/json')
-
-    if [ "${script_get_httpcode}" != "200" ]; then
-        echo -n "Creating nexus init script... "
-        local script_post_httpcode=$(docker exec "${nexus_container_name}" curl --silent --write-out '%{http_code}\n' -X POST http://localhost:8081/service/rest/v1/script \
-            --header 'Authorization: Basic YWRtaW46YWRtaW4xMjM=' \
-            --header 'Content-Type: application/json' \
-            --data "{ \"name\": \"init-repos\", \"type\": \"groovy\", \"content\": \"${nexus_init_script}\" }")
-        if [ "${script_post_httpcode}" == "204" ]; then
-            echo "success."
-        else
-            echo "failed with http code ${script_post_httpcode}"
-        fi
+    if [ ! -z "${no_proxy}" ]; then
+        local no_proxy_nexus_init="${no_proxy},s4sdk-nexus"
     else
-        echo -n "Updating nexus init script... "
-        local script_put_httpcode=$(docker exec "${nexus_container_name}" curl --silent --write-out '%{http_code}\n' -X PUT http://localhost:8081/service/rest/v1/script/init-repos \
-            --header 'Authorization: Basic YWRtaW46YWRtaW4xMjM=' \
-            --header 'Content-Type: application/json' \
-            --data "{ \"name\": \"init-repos\", \"type\": \"groovy\", \"content\": \"${nexus_init_script}\" }")
-
-        if [ "${script_put_httpcode}" == "204" ]; then
-            echo "success."
-        else
-            echo "failed with http code ${script_put_httpcode}"
-        fi
+        local no_proxy_nexus_init="s4sdk-nexus"
     fi
 
-    docker exec "${nexus_container_name}" curl --silent --write-out 'HTTP: %{http_code}\n' -X POST http://localhost:8081/service/rest/v1/script/init-repos/run \
-      --header 'Authorization: Basic YWRtaW46YWRtaW4xMjM=' \
-      --header 'Content-Type: text/plain'
+    no_proxy=${no_proxy_nexus_init} node /cx-server/init-nexus.js "{\"mvn_repository_url\": \"${mvn_repository_url}\", \"npm_registry_url\": \"${npm_registry_url}\", \"http_proxy\": \"${http_proxy}\", \"https_proxy\": \"${https_proxy}\", \"no_proxy\": \"${no_proxy}\"}"
 }
 
 function start_jenkins()

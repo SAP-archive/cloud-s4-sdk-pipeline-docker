@@ -17,6 +17,9 @@ RUN npm config delete registry
 COPY checkversion.js .
 COPY updateversion.js .
 
+ADD nexus-init-repos.groovy .
+ADD init-nexus.js .
+
 # Package cx-server(.bat) in this image so we can update them for the user without curl-ing
 ADD $cx_server_base_uri .
 RUN dos2unix cx-server
