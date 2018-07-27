@@ -3,7 +3,7 @@
 container_name='s4sdk-jenkins-master'
 backup_file_name="jenkins_home_$(date -u +%Y-%m-%dT%H%M%Z).tar.gz"
 nexus_container_name='s4sdk-nexus'
-cache_docker_image='sonatype/nexus3:3.12.1'
+cache_docker_image='sonatype/nexus3:3.13.0'
 cxserver_companion_docker_image='s4sdk/cxserver-companion'
 
 network_name='s4sdk-network'
@@ -320,6 +320,8 @@ function start_nexus()
             stop_nexus
         fi
         run docker network create "${network_name}"
+        local my_container_id=$(head -n 1 /proc/self/cgroup | cut -d '/' -f3)
+        run docker network connect "${network_name}" ${my_container_id}
         start_nexus_container
     else
         echo "Download cache disabled."
@@ -372,9 +374,6 @@ function wait_for_nexus_started()
 
 function init_nexus()
 {
-    local my_container_id=$(head -n 1 /proc/self/cgroup | cut -d '/' -f3)
-    docker network connect s4sdk-network ${my_container_id}
-
     if [ -z "${mvn_repository_url}" ]; then
         mvn_repository_url='https://repo.maven.apache.org/maven2/'
     fi
@@ -728,7 +727,7 @@ function check_memory() {
     # Depending on the workload, much more memory will be required.
     memory=$(free -m | awk '/^Mem:/{print $2}');
     # The "magic number" is an approximation based on setting the memory of the Linux VM to 4 GiB on Docker for Mac
-    if [ $memory -lt "3900" ]; then
+    if [ ${memory} -lt "3900" ]; then
         log_warn "Low memory detected ($memory MiB). Please ensure Docker has at least 4 GiB of memory. Depending on the number of jobs running, much more memory might be required. On Windows and Mac, check how much memory Docker can use in \"Preferences\", \"Advanced\"."
     fi
 }
