@@ -9,8 +9,7 @@ def dockerImages = [
         ['folder': 's4sdk-docker-node-browsers', 'name': 's4sdk/docker-node-browsers'],
         ['folder': 's4sdk-jenkins-master', 'name': 's4sdk/jenkins-master'],
         ['folder': 's4sdk-jenkins-agent', 'name': 's4sdk/jenkins-agent'],
-        ['folder': 's4sdk-docker-maven-npm', 'name': 's4sdk/docker-maven-npm'],
-        ['folder': 's4sdk-jenkins-agent-k8s', 'name': 's4sdk/jenkins-agent-k8s']
+        ['folder': 's4sdk-docker-maven-npm', 'name': 's4sdk/docker-maven-npm']
 ]
 
 node {
