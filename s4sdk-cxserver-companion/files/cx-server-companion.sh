@@ -321,7 +321,7 @@ function start_nexus()
         fi
         run docker network create "${network_name}"
         local my_container_id=$(head -n 1 /proc/self/cgroup | cut -d '/' -f3)
-        run docker network connect "${network_name}" ${my_container_id}
+        run docker network connect "${network_name}" "${my_container_id}"
         start_nexus_container
     else
         echo "Download cache disabled."
@@ -720,20 +720,40 @@ function update_cx_server_script()
     exit 0
 }
 
+# With too little memory, containers might get killed without any notice to the user.
+# This is likely the case when running Docker on Windows or Mac, where a Virtual Machine is used which has 2 GB memory by default.
+# At least, we can indicate that memory might be an issue to the user.
 function check_memory() {
-    # With too little memory, containers might get killed without any notice to the user.
-    # This is likely the case when running Docker on Windows or Mac, where a Virtual Machine is used which has 2 GiB memory by default.
-    # At least, we can indicate that memory might be an issue to the user.
-    # Depending on the workload, much more memory will be required.
     memory=$(free -m | awk '/^Mem:/{print $2}');
-    # The "magic number" is an approximation based on setting the memory of the Linux VM to 4 GiB on Docker for Mac
-    if [ ${memory} -lt "3900" ]; then
-        log_warn "Low memory detected ($memory MiB). Please ensure Docker has at least 4 GiB of memory. Depending on the number of jobs running, much more memory might be required. On Windows and Mac, check how much memory Docker can use in \"Preferences\", \"Advanced\"."
+    # The "magic number" is an approximation based on setting the memory of the Linux VM to 4 GB on Docker for Mac
+    if [ "${memory}" -lt "3900" ]; then
+        echo "${memory}"
+    fi
+}
+
+function warn_low_memory() {
+    local memory=$(check_memory)
+    if [ ! -z "${memory}" ]; then
+        log_warn "Low memory detected (${memory} MB). Please ensure Docker has at least 4 GB of memory. Depending on the number of jobs running, much more memory might be required. On Windows and Mac, check how much memory Docker can use in 'Preferences', 'Advanced'."
+    fi
+}
+
+function warn_low_memory_with_confirmation() {
+    warn_low_memory
+    local memory=$(check_memory)
+    if [ ! -z "${memory}" ]; then
+        log_warn "Are you sure you want to continue starting Cx Server with this amount of memory? (Y/N)"
+
+        read answer
+        if [ "$answer" == "Y" ] || [ "$answer" == "y" ] || [ "$answer" == "YES" ] || [ "$answer" == "yes" ]; then
+            log_warn "Please keep an eye on the available memory, for example, using 'docker stats'."
+        else
+            exit 1
+        fi
     fi
 }
 
 ### Start of Script
-check_memory
 read_configuration
 
 # ensure that docker is installed
@@ -744,6 +764,7 @@ if [ "$1" == "backup" ]; then
 elif [ "$1" == "restore" ]; then
     restore_volume "$2"
 elif [ "$1" == "start" ]; then
+    warn_low_memory_with_confirmation
     check_image_update
     start_nexus
     start_jenkins
@@ -776,8 +797,10 @@ elif [ "$1" == "update" ]; then
     fi
 elif [ "$1" == "help" ]; then
     display_help
+    warn_low_memory
 else
     display_help "$1"
+    warn_low_memory
 fi
 
 if [ -z ${DEVELOPER_MODE} ]; then update_cx_server_script; fi
