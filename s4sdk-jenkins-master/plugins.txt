@@ -50,7 +50,6 @@ htmlpublisher
 extended-read-permission
 global-build-stats
 icon-shim
-jira
 junit
 jacoco
 ace-editor
@@ -58,6 +57,7 @@ javadoc
 jenkins-jira-issue-updater
 jobConfigHistory
 job-import-plugin
+kubernetes
 ldap
 lockable-resources
 mailer

@@ -22,8 +22,8 @@ RUN apt-get update && \
     rm -rf /var/lib/apt/lists/* /var/cache/apt/*
 
 # add group & user
-RUN addgroup -gid 1000 jenkins
-RUN useradd jenkins -d "$JENKINS_HOME" --uid 1000 --gid 1000 --shell /bin/bash --create-home
+RUN addgroup -gid 1000 jenkins && \
+    useradd jenkins -d "$JENKINS_HOME" --uid 1000 --gid 1000 --shell /bin/bash --create-home
 
 VOLUME /var/jenkins_home
 

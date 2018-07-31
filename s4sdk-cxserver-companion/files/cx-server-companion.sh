@@ -3,7 +3,7 @@
 container_name='s4sdk-jenkins-master'
 backup_file_name="jenkins_home_$(date -u +%Y-%m-%dT%H%M%Z).tar.gz"
 nexus_container_name='s4sdk-nexus'
-cache_docker_image='sonatype/nexus3:3.8.0'
+cache_docker_image='sonatype/nexus3:3.13.0'
 cxserver_companion_docker_image='s4sdk/cxserver-companion'
 
 network_name='s4sdk-network'
@@ -320,6 +320,8 @@ function start_nexus()
             stop_nexus
         fi
         run docker network create "${network_name}"
+        local my_container_id=$(head -n 1 /proc/self/cgroup | cut -d '/' -f3)
+        run docker network connect "${network_name}" "${my_container_id}"
         start_nexus_container
     else
         echo "Download cache disabled."
@@ -346,7 +348,7 @@ function start_nexus_container()
         local environment_variable_parameters=()
         if [ ! -z "${x_nexus_java_opts}" ]; then
             local container_java_opts="$(get_image_environment_variable ${cache_docker_image} INSTALL4J_ADD_VM_PARAMS)"
-            local effective_java_opts="-e INSTALL4J_ADD_VM_PARAMS=\""${container_java_opts}" "${x_nexus_java_opts}"\""
+            local effective_java_opts=" -e INSTALL4J_ADD_VM_PARAMS=\""${container_java_opts}" "${x_nexus_java_opts}"\""
         fi
         environment_variable_parameters+="$(get_proxy_parameters "${cache_docker_image}")"
         environment_variable_parameters+="${effective_java_opts}"
@@ -379,42 +381,15 @@ function init_nexus()
         npm_registry_url='https://registry.npmjs.org/'
     fi
 
-    nexus_init_script="synchronized(this) {\\n    def result = [created: [], deleted: []]\\n\\n    def repoManager = repository.repositoryManager\\n    def existingRepoNames = repoManager.browse().collect { repo -> repo.name }\\n\\n    def mvnProxyName = 'mvn-proxy'\\n    if (!existingRepoNames.contains(mvnProxyName)) {\\n        repository.createMavenProxy(mvnProxyName, '${mvn_repository_url}')\\n        result.created.add(mvnProxyName)\\n    }\\n    def npmProxyName = 'npm-proxy'\\n    if (!existingRepoNames.contains(npmProxyName)) {\\n        repository.createNpmProxy(npmProxyName, '${npm_registry_url}')\\n        result.created.add(npmProxyName)\\n    }\\n\\n    def proxyRepos = [ npmProxyName, mvnProxyName ]\\n    def toDelete = existingRepoNames.findAll { !proxyRepos.contains(it) }\\n\\n    for(def repoName : toDelete) {\\n        repoManager.delete(repoName)\\n        result.deleted.add(repoName)\\n    }\\n\\n    return result\\n}\\n"
-
     echo "Initializing Nexus"
 
-    local script_get_httpcode=$(docker exec "${nexus_container_name}" curl --silent --write-out '%{http_code}' -o /dev/null -X GET http://localhost:8081/service/rest/v1/script/init-repos \
-      --header 'Authorization: Basic YWRtaW46YWRtaW4xMjM=' \
-      --header 'Content-Type: application/json')
-
-    if [ "${script_get_httpcode}" != "200" ]; then
-        echo -n "Creating nexus init script... "
-        local script_post_httpcode=$(docker exec "${nexus_container_name}" curl --silent --write-out '%{http_code}\n' -X POST http://localhost:8081/service/rest/v1/script \
-            --header 'Authorization: Basic YWRtaW46YWRtaW4xMjM=' \
-            --header 'Content-Type: application/json' \
-            --data "{ \"name\": \"init-repos\", \"type\": \"groovy\", \"content\": \"${nexus_init_script}\" }")
-        if [ "${script_post_httpcode}" == "204" ]; then
-            echo "success."
-        else
-            echo "failed with http code ${script_post_httpcode}"
-        fi
+    if [ ! -z "${no_proxy}" ]; then
+        local no_proxy_nexus_init="${no_proxy},s4sdk-nexus"
     else
-        echo -n "Updating nexus init script... "
-        local script_put_httpcode=$(docker exec "${nexus_container_name}" curl --silent --write-out '%{http_code}\n' -X PUT http://localhost:8081/service/rest/v1/script/init-repos \
-            --header 'Authorization: Basic YWRtaW46YWRtaW4xMjM=' \
-            --header 'Content-Type: application/json' \
-            --data "{ \"name\": \"init-repos\", \"type\": \"groovy\", \"content\": \"${nexus_init_script}\" }")
-
-        if [ "${script_put_httpcode}" == "204" ]; then
-            echo "success."
-        else
-            echo "failed with http code ${script_put_httpcode}"
-        fi
+        local no_proxy_nexus_init="s4sdk-nexus"
     fi
 
-    docker exec "${nexus_container_name}" curl --silent --write-out 'HTTP: %{http_code}\n' -X POST http://localhost:8081/service/rest/v1/script/init-repos/run \
-      --header 'Authorization: Basic YWRtaW46YWRtaW4xMjM=' \
-      --header 'Content-Type: text/plain'
+    no_proxy=${no_proxy_nexus_init} node /cx-server/init-nexus.js "{\"mvn_repository_url\": \"${mvn_repository_url}\", \"npm_registry_url\": \"${npm_registry_url}\", \"http_proxy\": \"${http_proxy}\", \"https_proxy\": \"${https_proxy}\", \"no_proxy\": \"${no_proxy}\"}"
 }
 
 function start_jenkins()
@@ -509,7 +484,7 @@ function start_jenkins_container()
             if [ ${host_os} = 'windows' ] ; then
                 cx_server_path="//$(echo $cx_server_path | sed -e 's/://' -e 's/\\/\//g')"
             fi
-            mount_parameters+=("-v $cx_server_path:/var/cx-server:ro")
+            mount_parameters+=("-v \"${cx_server_path}\":/var/cx-server:ro")
         fi
 
         # start container
@@ -706,38 +681,76 @@ function update_cx_server_script()
     # Bash
     if [ ! -f '/cx-server/cx-server' ]; then
         echo ""
-        log_error 'Failed to read newest cx-server version for Bash.'
-    fi
-    newest_version="$(</cx-server/cx-server)"
+        log_error 'Failed to read newest cx-server version for Bash. Skipping update.'
+    else
+        newest_version="$(</cx-server/cx-server)"
 
-    if [ ! -f '/cx-server/mount/cx-server' ]; then
-        echo ""
-        log_error 'Failed to read current cx-server version for Bash.'
+        if [ ! -f '/cx-server/mount/cx-server' ]; then
+            echo ""
+            log_warn 'Failed to read current cx-server version for Bash. Updating to new version.'
+            echo "${newest_version}" > '/cx-server/mount/cx-server'
+        fi
+        this_version="$(</cx-server/mount/cx-server)"
+        if [ "${this_version}" != "${newest_version}" ]; then
+            echo " detected newer version. Applying update."
+            echo "${newest_version}" > '/cx-server/mount/cx-server'
+        fi
     fi
-    this_version="$(</cx-server/mount/cx-server)"
-    if [ "${this_version}" != "${newest_version}" ]; then
-        echo " detected newer version. Applying update."
-        echo "${newest_version}" > '/cx-server/mount/cx-server'
-    fi
+
 
     # Windows
     if [ ! -f '/cx-server/cx-server.bat' ]; then
         echo ""
-        log_error 'Failed to read newest cx-server version for Windows.'
-    fi
-    newest_version_bat="$(</cx-server/cx-server.bat)"
+        log_error 'Failed to read newest cx-server version for Windows. Skipping update.'
+    else
+        newest_version_bat="$(</cx-server/cx-server.bat)"
 
-    if [ ! -f '/cx-server/mount/cx-server.bat' ]; then
-        echo ""
-        log_error 'Failed to read current cx-server version for Windows.'
-    fi
-    this_version_bat="$(</cx-server/mount/cx-server.bat)"
-    if [ "${this_version_bat}" != "${newest_version_bat}" ]; then
-        echo " detected newer version for Windows. Applying update."
-        echo "${newest_version_bat}" > '/cx-server/mount/cx-server.bat'
-        unix2dos /cx-server/mount/cx-server.bat
+        if [ ! -f '/cx-server/mount/cx-server.bat' ]; then
+            echo ""
+            log_warn 'Failed to read current cx-server version for Windows. Updating to new version.'
+            echo "${newest_version_bat}" > '/cx-server/mount/cx-server.bat'
+        fi
+        this_version_bat="$(</cx-server/mount/cx-server.bat)"
+        if [ "${this_version_bat}" != "${newest_version_bat}" ]; then
+            echo " detected newer version for Windows. Applying update."
+            echo "${newest_version_bat}" > '/cx-server/mount/cx-server.bat'
+            unix2dos /cx-server/mount/cx-server.bat
+        fi
     fi
     exit 0
+}
+
+# With too little memory, containers might get killed without any notice to the user.
+# This is likely the case when running Docker on Windows or Mac, where a Virtual Machine is used which has 2 GB memory by default.
+# At least, we can indicate that memory might be an issue to the user.
+function check_memory() {
+    memory=$(free -m | awk '/^Mem:/{print $2}');
+    # The "magic number" is an approximation based on setting the memory of the Linux VM to 4 GB on Docker for Mac
+    if [ "${memory}" -lt "3900" ]; then
+        echo "${memory}"
+    fi
+}
+
+function warn_low_memory() {
+    local memory=$(check_memory)
+    if [ ! -z "${memory}" ]; then
+        log_warn "Low memory detected (${memory} MB). Please ensure Docker has at least 4 GB of memory. Depending on the number of jobs running, much more memory might be required. On Windows and Mac, check how much memory Docker can use in 'Preferences', 'Advanced'."
+    fi
+}
+
+function warn_low_memory_with_confirmation() {
+    warn_low_memory
+    local memory=$(check_memory)
+    if [ ! -z "${memory}" ]; then
+        log_warn "Are you sure you want to continue starting Cx Server with this amount of memory? (Y/N)"
+
+        read answer
+        if [ "$answer" == "Y" ] || [ "$answer" == "y" ] || [ "$answer" == "YES" ] || [ "$answer" == "yes" ]; then
+            log_warn "Please keep an eye on the available memory, for example, using 'docker stats'."
+        else
+            exit 1
+        fi
+    fi
 }
 
 ### Start of Script
@@ -751,6 +764,7 @@ if [ "$1" == "backup" ]; then
 elif [ "$1" == "restore" ]; then
     restore_volume "$2"
 elif [ "$1" == "start" ]; then
+    warn_low_memory_with_confirmation
     check_image_update
     start_nexus
     start_jenkins
@@ -783,8 +797,10 @@ elif [ "$1" == "update" ]; then
     fi
 elif [ "$1" == "help" ]; then
     display_help
+    warn_low_memory
 else
     display_help "$1"
+    warn_low_memory
 fi
 
 if [ -z ${DEVELOPER_MODE} ]; then update_cx_server_script; fi
