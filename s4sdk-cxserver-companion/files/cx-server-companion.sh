@@ -502,7 +502,7 @@ function backup_volume()
 {
     # FNR will skip the header and awk will print only 4th column of the output.
     free_space=$(df -h /backup | awk 'FNR > 1 {print $4}')
-    used_space=$(docker run -v ${jenkins_home}:/volume alpine du -sh /volume|awk '{print $1}')
+    used_space=$(docker run --rm -v ${jenkins_home}:/volume alpine du -sh /volume|awk '{print $1}')
     log_info "Available free space on the host is ${free_space} and the size of the volume is ${used_space}"
 
     # Backup can be taken when Jenkins server is up
@@ -623,7 +623,7 @@ function check_image_update()
         echo "skipping update check because custom docker registry is used."
     else
         local proxy_params=$(get_proxy_parameters "${cxserver_companion_docker_image}")
-        stdout="$(docker run ${proxy_params[*]} "${cxserver_companion_docker_image}" node /cx-server/checkversion.js "${docker_image}")"
+        stdout="$(docker run --rm ${proxy_params[*]} "${cxserver_companion_docker_image}" node /cx-server/checkversion.js "${docker_image}")"
         return_code=$?
 
         if [ ${return_code} -eq 0 ]; then
