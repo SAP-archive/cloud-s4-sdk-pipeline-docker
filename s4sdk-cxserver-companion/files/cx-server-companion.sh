@@ -734,7 +734,9 @@ function check_memory() {
 function warn_low_memory() {
     local memory=$(check_memory)
     if [ ! -z "${memory}" ]; then
-        log_warn "Low memory detected (${memory} MB). Please ensure Docker has at least 4 GB of memory. Depending on the number of jobs running, much more memory might be required. On Windows and Mac, check how much memory Docker can use in 'Preferences', 'Advanced'."
+        log_warn "Low memory assigned to Docker detected (${memory} MB). Please ensure Docker has at least 4 GB of memory, otherwise your builds are likely to fail."
+        log_warn "Depending on the number of jobs running, much more memory might be required."
+        log_warn "On Windows and Mac, check how much memory Docker can use in 'Preferences', 'Advanced'. See https://docs.docker.com/docker-for-windows/#advanced or https://docs.docker.com/docker-for-mac/#advanced for more details."
     fi
 }
 
