@@ -39,3 +39,5 @@ cx-server.bat [command]
 To switch back to the "normal" behavior, unset the environment variable `DEVELOPER_MODE`.
 
 Also __please note__ that the `cx-server` script always worked with the assumption that it was invoked from its directory, which is still the case.
+
+For more convenient usage of `cx-server`, you can source the `cx-server-completion.bash` script, which makes the sub-commands of `cx-server` known.

@@ -21,16 +21,24 @@ synchronized (this) {
 
     if ('<%= http_proxy %>'?.trim()) {
         URL httpProxy = new URL('<%= http_proxy %>')
+        println("httpProxy: ${httpProxy}")
         core.httpProxy(httpProxy.host, httpProxy.port)
     }
 
     if ('<%= https_proxy %>'?.trim()) {
         URL httpsProxy = new URL('<%= https_proxy %>')
+        println("httpsProxy: ${httpsProxy}")
         core.httpsProxy(httpsProxy.host, httpsProxy.port)
     }
 
     if (('<%= http_proxy %>'?.trim() || '<%= https_proxy %>'?.trim()) && '<%= no_proxy %>'?.trim()) {
         String[] nonProxyHosts = '<%= no_proxy %>'.split(',')
+        /* Insert wildcards to have a rough conversion between the unix-like no-proxy list and the java notation.
+         * For example, `localhost,.corp,.maven.apache.org,x.y.,myhost` will be transformed to
+         * `[*localhost,*.corp,*.maven.apache.org,*x.y,*myhost]`. */
+                .collect { it.replaceFirst('\\.$', '')}
+                .collect { "*${it}" }
+        println("nonProxyHosts: ${nonProxyHosts.join(',')}")
         core.nonProxyHosts(nonProxyHosts)
     }
 
