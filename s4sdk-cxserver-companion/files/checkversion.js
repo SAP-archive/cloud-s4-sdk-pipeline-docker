@@ -105,13 +105,17 @@ function extractVersionNumbers(aTags) {
 
 /***
  * Extracts version number from tag or returns null if no version number is present (e.g. if tag is 'latest')
- * @param strTag
+ * @param strTag The tag name, for example "v10"
  * @returns version number, or null if not present
  */
 function getVersionNumberFromTagName(strTag) {
-    const match = strTag.match(/^v(\d)+$/);
+    const match = strTag.match(/^v(\d+)$/);
     if (match) {
-        return Number.parseInt(match[1]);
+        const versionNumber = Number.parseInt(match[1]);
+        if (!(versionNumber.toString().length == strTag.length - 1)) {
+            exit(`Sanity check failed. Expected ${versionNumber} to be one character shorter than ${strTag}.`)
+        }
+        return versionNumber;
     }
     else {
         return null;
