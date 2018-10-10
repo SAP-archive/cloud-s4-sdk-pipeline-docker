@@ -758,6 +758,8 @@ function warn_low_memory_with_confirmation() {
 ### Start of Script
 read_configuration
 
+docker run --rm --mount source="${jenkins_home}",target=/jenkins_home,type=volume s4sdk/cxserver-companion node /cx-server/create-salt.js
+
 # ensure that docker is installed
 command -v docker > /dev/null 2>&1 || { echo >&2 "Docker does not seem to be installed. Please install docker and ensure that the docker command is included in \$PATH."; exit 1; }
 
