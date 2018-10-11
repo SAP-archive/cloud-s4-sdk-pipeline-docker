@@ -183,7 +183,7 @@ function get_proxy_parameters()
 function wait_for_started()
 {
     echo -n "Waiting for the Cx server to start"
-    retry 120 1 0 docker exec "${container_name}" curl --silent "http://localhost:8080/api/json"
+    retry 120 1 0 docker exec "${container_name}" curl --noproxy localhost --silent "http://localhost:8080/api/json"
 }
 
 function stop_jenkins()
@@ -212,7 +212,7 @@ function stop_jenkins_container()
     echo ""
     echo "Initiating safe shutdown..."
 
-    exitCmd=(docker exec ${container_name} curl --write-out '%{http_code}' --output /dev/null --silent "${user_and_pass[@]}" -X POST 'http://localhost:8080/safeExit')
+    exitCmd=(docker exec ${container_name} curl --noproxy localhost --write-out '%{http_code}' --output /dev/null --silent "${user_and_pass[@]}" -X POST 'http://localhost:8080/safeExit')
 
     if [ ! -z "${password}" ]; then
         trace_execution "${exitCmd[@]//${password}/******}"
@@ -369,7 +369,7 @@ function start_nexus_container()
 function wait_for_nexus_started()
 {
     echo -n "Waiting for the nexus server to start"
-    retry 120 1 0 docker exec "${nexus_container_name}" curl --silent -X GET http://localhost:8081/service/rest/v1/script --header \'Authorization: Basic YWRtaW46YWRtaW4xMjM=\' --header \'Content-Type: application/json\'
+    retry 120 1 0 docker exec "${nexus_container_name}" curl --noproxy localhost --silent -X GET http://localhost:8081/service/rest/v1/script --header \'Authorization: Basic YWRtaW46YWRtaW4xMjM=\' --header \'Content-Type: application/json\'
 }
 
 function init_nexus()
