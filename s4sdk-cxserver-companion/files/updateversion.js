@@ -53,7 +53,7 @@ fs.readFile(serverCfgPath, 'utf8', function (err, data) {
 
         fs.writeFileSync(serverCfgPath, strNewFile);
 
-        console.log("Replaced", matches.length, "occurrences of docker_image at offsets", matches)
+        console.log("Replaced", matches.length, "occurences of docker_image at offsets", matches)
     }
 });
 
