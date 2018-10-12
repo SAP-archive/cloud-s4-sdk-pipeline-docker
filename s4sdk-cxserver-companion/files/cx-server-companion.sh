@@ -448,12 +448,16 @@ function start_jenkins_container()
             else
                 image_name="${docker_image}"
             fi
-            run "docker pull ${image_name}"
-            if [ $? -ne "0" ]; then
-                log_error "Failed to pull '$image_name'."
-                exit $?;
+
+            if [ -z ${DEVELOPER_MODE} ]; then 
+                run "docker pull ${image_name}"; 
+                if [ $? -ne "0" ]; then
+                    log_error "Failed to pull '$image_name'."
+                    exit $?;
+                fi
             fi
         fi
+
         # determine docker gid
         docker_gid=$(stat -c '%g' /var/run/docker.sock)
 
