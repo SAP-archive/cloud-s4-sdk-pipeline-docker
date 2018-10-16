@@ -319,7 +319,15 @@ function start_nexus()
         if is_running "${nexus_container_name}" ; then
             stop_nexus
         fi
-        run docker network create "${network_name}"
+
+        if [ $(docker network ls|grep -c ${network_name}) -gt 1 ]; then
+            remove_networks
+        fi
+
+        if [ $(docker network ls|grep -c ${network_name}) -eq 0 ]; then
+            run docker network create "${network_name}"
+        fi
+
         local my_container_id=$(head -n 1 /proc/self/cgroup | cut -d '/' -f3)
         run docker network connect "${network_name}" "${my_container_id}"
         start_nexus_container
@@ -599,9 +607,10 @@ function remove_containers()
 
 function remove_networks()
 {
-    if [ $(docker network ls|grep -c ${network_name}) -gt 0 ]; then
-        run docker network remove "${network_name}"
-    fi
+    for network_id in $(docker network ls | grep ${network_name} | awk '{print $1}')
+    do
+        run docker network remove "${network_id}"
+    done
 }
 
 function read_configuration()
