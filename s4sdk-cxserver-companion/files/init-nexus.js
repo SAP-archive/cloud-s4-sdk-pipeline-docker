@@ -58,15 +58,17 @@ const scriptRequestBody = {
 nexusRequest
     .get(`${baseUrl}service/rest/v1/script/init-repos`)
     .on('response', function (response) {
-        console.log(`Query nexus initialization script, response: ${response.statusMessage}`)
         if (response.statusCode !== 200) {
             console.log('Creating nexus initialization script...')
             nexusRequest
                 .post(`${baseUrl}service/rest/v1/script`)
                 .json(scriptRequestBody)
                 .on('response', function (response) {
-                    console.log(`Create nexus initialization script, response: ${response.statusMessage}`)
-                    runScript()
+                    if (isInSuccessFamily(response.statusCode)) {
+                        runScript()
+                    } else {
+                        console.log(`Unexpected status ${response.statusMessage} when creating nexus initialization script. Can't run script.`)
+                    }
                 })
         } else {
             console.log('Updating nexus initialization script...')
@@ -74,8 +76,11 @@ nexusRequest
                 .put(`${baseUrl}service/rest/v1/script/init-repos`)
                 .json(scriptRequestBody)
                 .on('response', function (response) {
-                    console.log(`Update nexus initialization script, response: ${response.statusMessage}`)
-                    runScript()
+                    if (isInSuccessFamily(response.statusCode)) {
+                        runScript()
+                    } else {
+                        console.log(`Unexpected status ${response.statusMessage} when updating nexus initialization script. Can't run script.`)
+                    }
                 })
         }
     })
@@ -91,4 +96,8 @@ function runScript() {
         .on('response', function (response) {
             console.log(`Run nexus initialization script, response: ${response.statusMessage}`)
         })
+}
+
+function isInSuccessFamily(statusCode) {
+    return statusCode.toString().startsWith("2")
 }

@@ -14,8 +14,12 @@ docker build [--build-arg cx_server_base_uri=https://github.some.domain/raw/path
 
 The build argument `cx_server_base_uri` is optional and only required if you don't want to use the `cx-server` version from GitHub.com.
 
-Usually, when running `cx-server`, the companion image is automatically pulled from Docker Hub.
-This is designed for simple usage, but if you've built the image yourself, it will overwrite your changes.
+When you make changes to `s4sdk/jenkins-master`, you also need to build the image locally.
+The important part is that you tag the image after building it.
+Assuming you changed an image, configured the `docker_registry` and `image_name` in the `server.cfg`, then you have to tag your image locally with `docker_registry/image_name`.
+
+Usually, when running `cx-server`, the companion and Jenkins images are automatically pulled from Docker Hub.
+This is designed for simple usage, but if you've built the images yourself, it will overwrite your changes.
 To prevent this, set the environment variable `DEVELOPER_MODE` to _any_ value.
 
 Run in developer mode on Bash

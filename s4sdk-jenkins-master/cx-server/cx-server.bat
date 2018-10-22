@@ -3,9 +3,9 @@
 ECHO Please note that Cx Server on Windows is for convenient development and evaluation.
 ECHO For running an productive Cx Server, please use a Linux System.
 
-IF %~1==backup GOTO NOT_SUPPORTED
-IF %~1==restore GOTO NOT_SUPPORTED
-IF %~1==update (
+IF "%~1"==backup GOTO NOT_SUPPORTED
+IF "%~1"==restore GOTO NOT_SUPPORTED
+IF "%~1"==update (
     IF "%~2"=="image" GOTO NOT_SUPPORTED
 )
 
