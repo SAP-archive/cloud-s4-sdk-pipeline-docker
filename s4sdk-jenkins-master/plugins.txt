@@ -1,5 +1,4 @@
 ansicolor
-ant
 authentication-tokens
 authorize-project
 branch-api
@@ -54,7 +53,6 @@ junit
 jacoco
 ace-editor
 javadoc
-jenkins-jira-issue-updater
 jobConfigHistory
 job-import-plugin
 kubernetes
@@ -120,7 +118,6 @@ sonargraph-integration
 analysis-collector
 analysis-core
 structs
-subversion
 thinBackup
 throttle-concurrents
 timestamper
