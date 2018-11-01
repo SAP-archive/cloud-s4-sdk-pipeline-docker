@@ -1,6 +1,7 @@
 ansicolor
 authentication-tokens
 authorize-project
+badge
 branch-api
 build-blocker-plugin
 build-environment
