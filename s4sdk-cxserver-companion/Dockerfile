@@ -1,4 +1,4 @@
-FROM node:10-alpine
+FROM node:11-alpine
 
 ARG npm_registry=https://registry.npmjs.org/
 ARG cx_server_base_uri=https://raw.githubusercontent.com/SAP/cloud-s4-sdk-pipeline-docker/master/s4sdk-jenkins-master/cx-server/cx-server
