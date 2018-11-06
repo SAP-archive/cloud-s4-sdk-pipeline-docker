@@ -10,7 +10,6 @@ build-pipeline-plugin
 buildresult-trigger
 blueocean
 checkmarx
-chucknorris
 clone-workspace-scm
 cloudbees-disk-usage-simple
 cobertura
@@ -31,7 +30,6 @@ docker-workflow
 durable-task
 email-ext
 envinject
-external-monitor-job
 extra-columns
 findbugs
 cloudbees-folder
@@ -62,8 +60,6 @@ lockable-resources
 mailer
 mapdb-api
 matrix-auth
-matrix-project
-jenkins-multijob-plugin
 nested-view
 antisamy-markup-formatter
 pam-auth
