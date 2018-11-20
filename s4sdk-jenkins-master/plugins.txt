@@ -1,7 +1,7 @@
 ansicolor
-ant
 authentication-tokens
 authorize-project
+badge
 branch-api
 build-blocker-plugin
 build-environment
@@ -10,7 +10,6 @@ build-pipeline-plugin
 buildresult-trigger
 blueocean
 checkmarx
-chucknorris
 clone-workspace-scm
 cloudbees-disk-usage-simple
 cobertura
@@ -31,7 +30,6 @@ docker-workflow
 durable-task
 email-ext
 envinject
-external-monitor-job
 extra-columns
 findbugs
 cloudbees-folder
@@ -54,7 +52,6 @@ junit
 jacoco
 ace-editor
 javadoc
-jenkins-jira-issue-updater
 jobConfigHistory
 job-import-plugin
 kubernetes
@@ -63,8 +60,6 @@ lockable-resources
 mailer
 mapdb-api
 matrix-auth
-matrix-project
-jenkins-multijob-plugin
 nested-view
 antisamy-markup-formatter
 pam-auth
@@ -120,7 +115,6 @@ sonargraph-integration
 analysis-collector
 analysis-core
 structs
-subversion
 thinBackup
 throttle-concurrents
 timestamper
