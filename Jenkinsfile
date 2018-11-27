@@ -14,6 +14,9 @@ def dockerImages = [
 ]
 
 node {
+    properties([
+        buildDiscarder(logRotator(daysToKeepStr: '5', numToKeepStr: '5')),
+    ])
     try {
         buildDockerImages(dockerImages)
     } finally {
