@@ -45,6 +45,7 @@ github
 gradle
 greenballs
 htmlpublisher
+http_request
 extended-read-permission
 global-build-stats
 icon-shim
