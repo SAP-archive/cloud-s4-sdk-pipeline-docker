@@ -18,10 +18,9 @@ WORKDIR /home/piper
 
 RUN cf add-plugin-repo CF-Community https://plugins.cloudfoundry.org \
     && cf install-plugin blue-green-deploy -f -r CF-Community \
-    && wget --quiet "https://github.com/cloudfoundry-incubator/multiapps-cli-plugin/releases/download/v2.0.0/cf-cli-mta-plugin-2.0.0-linux.bin" \
+    && wget --quiet "https://github.com/cloudfoundry-incubator/multiapps-cli-plugin/releases/download/v2.0.7/mta_plugin_linux_amd64" \
        --directory-prefix /home/piper/downloads \
-    && mv /home/piper/downloads/cf-cli-mta-plugin-2.0.0-linux.bin /home/piper/downloads/cf-cli-mta-plugin.bin \
-    && chmod +x /home/piper/downloads/cf-cli-mta-plugin.bin \
-    && cf install-plugin /home/piper/downloads/cf-cli-mta-plugin.bin -f \
+    && chmod +x /home/piper/downloads/mta_plugin_linux_amd64 \
+    && cf install-plugin /home/piper/downloads/mta_plugin_linux_amd64 -f \
     && rm -rf /home/piper/downloads \
     && cf plugins
