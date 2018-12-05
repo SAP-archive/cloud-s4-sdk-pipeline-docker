@@ -517,6 +517,16 @@ function backup_volume()
     used_space=$(docker run --rm -v ${jenkins_home}:/volume alpine du -sh /volume|awk '{print $1}')
     log_info "Available free space on the host is ${free_space} and the size of the volume is ${used_space}"
 
+    free_space_bytes=$(df /backup | awk 'FNR > 1 {print $4}')
+    used_space_bytes=$(docker run --rm -v ${jenkins_home}:/volume alpine du -s /volume|awk '{print $1}')
+    # Defensive estimation: Backup needs twice the volume size (copying + zipping)
+    estimated_free_space_after_backup=$(expr ${free_space_bytes} - $(expr ${used_space_bytes} \* 2))
+
+    if [[ ${estimated_free_space_after_backup} -lt 0 ]]; then
+      log_error "Not enough disk space for creating a backup. We require twice the size of the volume."
+      exit 1
+    fi
+
     # Backup can be taken when Jenkins server is up
     # https://wiki.jenkins.io/display/JENKINS/Administering+Jenkins
     log_info "Backup of ${jenkins_home} is in progress. It may take several minutes to complete."
