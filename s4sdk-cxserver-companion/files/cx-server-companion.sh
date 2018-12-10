@@ -578,6 +578,7 @@ function display_help()
     echo ""
     echo "Commands:"
     command_help_text 'start'         'Starts the server container using the configured parameters for jenkins_home, docker_registry, docker_image, http_port.'
+    command_help_text 'status'        'Display status information about Cx Server'
     command_help_text 'stop'          'Stops the running server container.'
     command_help_text 'remove'        "Removes a stopped server container. A subsequent call of 'start' will instantiate a fresh container."
     command_help_text 'backup'        "Takes a backup of the configured 'jenkins_home' and stores it in the configured 'backup_directory'."
@@ -853,6 +854,8 @@ elif [ "$1" == "update" ]; then
 elif [ "$1" == "help" ]; then
     display_help
     warn_low_memory
+elif [ "$1" == "status" ]; then
+    node /cx-server/status.js "{\"cache_enabled\": \"${cache_enabled}\"}"
 else
     display_help "$1"
     warn_low_memory
