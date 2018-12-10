@@ -18,7 +18,6 @@ RUN apt-get update && \
     apt-get update && \
     apt-get -y --no-install-recommends install docker-ce && \
     rm -rf /var/lib/apt/lists/* /var/cache/apt/*
-
 COPY init_s4sdk_library.groovy /usr/share/jenkins/ref/init.groovy.d/init_s4sdk_library.groovy.override
 COPY init_executors.groovy /usr/share/jenkins/ref/init.groovy.d/init_executors.groovy.override
 COPY launch-s4sdk-agent.sh /usr/share/jenkins/ref/launch-s4sdk-agent.sh.override
@@ -35,7 +34,6 @@ USER jenkins
 RUN echo 2.0 > /usr/share/jenkins/ref/jenkins.install.UpgradeWizard.state
 
 VOLUME /var/jenkins_ssl
-ENV JENKINS_OPTS --httpPort=8080 --httpsPort=-1
 ENV JAVA_OPTS $JAVA_OPTS -Djenkins.install.runSetupWizard=false -Dhudson.model.DirectoryBrowserSupport.CSP=
 
-EXPOSE 8080
+EXPOSE 8080 8443
