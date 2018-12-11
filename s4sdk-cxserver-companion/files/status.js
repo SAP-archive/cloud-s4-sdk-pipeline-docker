@@ -3,7 +3,7 @@
 'use strict';
 
 if (!process.argv[2]) {
-    console.log("Missing parameter: Configuration object is not specified");
+    console.error("Missing parameter: Configuration object is not specified");
     process.exit(-1);
 }
 
