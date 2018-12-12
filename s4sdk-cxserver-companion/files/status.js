@@ -10,7 +10,7 @@ if (!process.argv[2]) {
 const configString = process.argv[2];
 const appConfig = JSON.parse(configString);
 
-const expectDownloadCacheIsRunning = Boolean(appConfig.cache_enabled) || (appConfig.cache_enabled == '');
+const expectDownloadCacheIsRunning = (appConfig.cache_enabled === true) || (appConfig.cache_enabled === 'true') || (appConfig.cache_enabled === '');
 
 const {
     spawnSync
@@ -19,17 +19,15 @@ const ps = spawnSync('docker', ['ps', '--no-trunc', '--format', '{{ json . }}', 
 
 const containers = ps.stdout.toString().split('\n').filter(line => line.length > 3).map(jsonLine => JSON.parse(jsonLine))
 
-if (expectDownloadCacheIsRunning) {
-    if (containers.filter(c => c.Names.includes("s4sdk-nexus")).length == 0) {
-        console.error("⚠️ Expected Download cache to be running, but it is not. Most likely, this is caused by low memory in Docker." + 
-        "To fix this, please ensure that Docker has at least 4 GB memory, and restart Cx Server.")
-    }
-}
-
-if (containers.length == 0) {
+if (containers.length === 0) {
     console.log('Cx Server is not running.')
 } else {
+    if (expectDownloadCacheIsRunning) {
+        if (containers.filter(c => c.Names.includes("s4sdk-nexus")).length === 0) {
+            console.error("⚠️ Expected Download cache to be running, but it is not. Most likely, this is caused by low memory in Docker." +
+            "To fix this, please ensure that Docker has at least 4 GB memory, and restart Cx Server.")
+        }
+    }
     console.log('Running Cx Server containers:')
     console.log(spawnSync('docker', ['ps', '--filter', 'name=s4sdk']).stdout.toString())
 }
-
