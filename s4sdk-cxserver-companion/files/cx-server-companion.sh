@@ -365,7 +365,12 @@ function start_nexus_container()
 
         print_nexus_config
 
-        run docker run --name "${nexus_container_name}" --rm --network="${network_name}" -d "${environment_variable_parameters[@]}" "${cache_docker_image}"
+        local nexus_port_mapping=""
+        if [ ! -z "${DEVELOPER_MODE}" ]; then
+            nexus_port_mapping="-p 8081:8081"
+        fi
+
+        run docker run --name "${nexus_container_name}" --rm "${nexus_port_mapping}" --network="${network_name}" -d "${environment_variable_parameters[@]}" "${cache_docker_image}"
         if [ $? -ne "0" ]; then
             log_error "Failed to start new nexus container."
             exit $?;
