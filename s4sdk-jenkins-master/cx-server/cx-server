@@ -26,5 +26,7 @@ mount_parameters+="--mount source=${jenkins_home},target=/jenkins_home,type=volu
 if [ "${tls_enabled}" == true ] && [ ! -z "${tls_certificate_directory}" ] ; then
     mount_parameters+="--mount source=${tls_certificate_directory},target=${tls_certificate_directory},type=bind "
 fi
-
-docker run --rm ${DOCKER_IT_FLAG} --workdir /cx-server/mount ${mount_parameters} --volume /var/run/docker.sock:/var/run/docker.sock --env DEVELOPER_MODE --env http_proxy --env https_proxy --env no_proxy --env host_os=unix --env cx_server_path="$(pwd)" s4sdk/cxserver-companion /cx-server/cx-server-companion.sh "$@"
+{
+    docker run --rm ${DOCKER_IT_FLAG} --workdir /cx-server/mount ${mount_parameters} --volume /var/run/docker.sock:/var/run/docker.sock --env DEVELOPER_MODE --env http_proxy --env https_proxy --env no_proxy --env host_os=unix --env cx_server_path="$(pwd)" s4sdk/cxserver-companion /cx-server/cx-server-companion.sh "$@"
+    exit $?
+}
