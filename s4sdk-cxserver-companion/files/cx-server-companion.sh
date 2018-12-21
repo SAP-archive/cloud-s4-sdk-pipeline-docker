@@ -3,7 +3,7 @@
 readonly container_name='s4sdk-jenkins-master'
 backup_file_name="jenkins_home_$(date -u +%Y-%m-%dT%H%M%Z).tar.gz"
 readonly nexus_container_name='s4sdk-nexus'
-readonly cache_docker_image='sonatype/nexus3:3.13.0'
+readonly cache_docker_image='sonatype/nexus3:3.14.0'
 readonly cxserver_companion_docker_image='s4sdk/cxserver-companion'
 readonly container_port_http=8080
 readonly container_port_https=8443
