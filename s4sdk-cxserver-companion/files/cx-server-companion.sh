@@ -330,7 +330,9 @@ function start_nexus()
             run docker network create "${network_name}"
         fi
 
-        local my_container_id=$(head -n 1 /proc/self/cgroup | cut -d '/' -f3)
+        #Two times rev in combination with cut -f1 returns the last element of the cgroup
+        #Returns f323454ad3402f2513712 applied to 10:name=systemd:/docker/f323454ad3402f2513712
+        local my_container_id=$(head -n 1 /proc/self/cgroup | rev | cut -d '/' -f1 | rev)
         run docker network connect "${network_name}" "${my_container_id}"
         start_nexus_container
     else
