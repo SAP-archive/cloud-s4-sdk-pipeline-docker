@@ -1,15 +1,17 @@
 #!/bin/bash
 
-container_name='s4sdk-jenkins-master'
+readonly container_name='s4sdk-jenkins-master'
 backup_file_name="jenkins_home_$(date -u +%Y-%m-%dT%H%M%Z).tar.gz"
-nexus_container_name='s4sdk-nexus'
-cache_docker_image='sonatype/nexus3:3.13.0'
-cxserver_companion_docker_image='s4sdk/cxserver-companion'
+readonly nexus_container_name='s4sdk-nexus'
+readonly cache_docker_image='sonatype/nexus3:3.14.0'
+readonly cxserver_companion_docker_image='s4sdk/cxserver-companion'
+readonly container_port_http=8080
+readonly container_port_https=8443
 
-network_name='s4sdk-network'
+readonly network_name='s4sdk-network'
 
-bold_start="\033[1m"
-bold_end="\033[0m"
+readonly bold_start="\033[1m"
+readonly bold_end="\033[0m"
 
 function log_error()
 {
@@ -183,7 +185,7 @@ function get_proxy_parameters()
 function wait_for_started()
 {
     echo -n "Waiting for the Cx server to start"
-    retry 120 1 0 docker exec "${container_name}" curl --noproxy localhost --silent "http://localhost:8080/api/json"
+    retry 120 1 0 docker exec "${container_name}" curl --noproxy localhost --silent "http://localhost:${container_port_http}/api/json"
 }
 
 function stop_jenkins()
@@ -212,7 +214,7 @@ function stop_jenkins_container()
     echo ""
     echo "Initiating safe shutdown..."
 
-    exitCmd=(docker exec ${container_name} curl --noproxy localhost --write-out '%{http_code}' --output /dev/null --silent "${user_and_pass[@]}" -X POST 'http://localhost:8080/safeExit')
+    exitCmd=(docker exec ${container_name} curl --noproxy localhost --write-out '%{http_code}' --output /dev/null --silent "${user_and_pass[@]}" -X POST "http://localhost:${container_port_http}/safeExit")
 
     if [ ! -z "${password}" ]; then
         trace_execution "${exitCmd[@]//${password}/******}"
@@ -328,7 +330,9 @@ function start_nexus()
             run docker network create "${network_name}"
         fi
 
-        local my_container_id=$(head -n 1 /proc/self/cgroup | cut -d '/' -f3)
+        #Two times rev in combination with cut -f1 returns the last element of the cgroup
+        #Returns f323454ad3402f2513712 applied to 10:name=systemd:/docker/f323454ad3402f2513712
+        local my_container_id=$(head -n 1 /proc/self/cgroup | rev | cut -d '/' -f1 | rev)
         run docker network connect "${network_name}" "${my_container_id}"
         start_nexus_container
     else
@@ -363,7 +367,12 @@ function start_nexus_container()
 
         print_nexus_config
 
-        run docker run --name "${nexus_container_name}" --rm --network="${network_name}" -d "${environment_variable_parameters[@]}" "${cache_docker_image}"
+        local nexus_port_mapping=""
+        if [ ! -z "${DEVELOPER_MODE}" ]; then
+            nexus_port_mapping="-p 8081:8081"
+        fi
+
+        run docker run --name "${nexus_container_name}" --rm "${nexus_port_mapping}" --network="${network_name}" -d "${environment_variable_parameters[@]}" "${cache_docker_image}"
         if [ $? -ne "0" ]; then
             log_error "Failed to start new nexus container."
             exit $?;
@@ -425,11 +434,10 @@ function start_jenkins_container()
             echo "Custom Dockerfile in '${customDockerfileDir} 'detected..."
             echo "Starting **customized** docker container for Cx Server."
             echo "Parameters:"
-            echo "   - http_port=${http_port}"
+            get_port_mapping port_mapping
             echo "   - jenkins_home=${jenkins_home}"
             print_jenkins_config
             echo ""
-            assert_config_set "http_port"
 
             image_name="s4sdk/jenkins-master-customized"
 
@@ -441,13 +449,12 @@ function start_jenkins_container()
         else
             echo "Starting docker container for Cx Server."
             echo "Parameters:"
-            echo "   - http_port=${http_port}"
+            get_port_mapping port_mapping
             echo "   - docker_registry=${docker_registry}"
             echo "   - docker_image=${docker_image}"
             print_jenkins_config
             echo ""
 
-            assert_config_set "http_port"
             assert_config_set "docker_image"
             assert_config_set "jenkins_home"
 
@@ -492,6 +499,21 @@ function start_jenkins_container()
         mount_parameters+=("-v /var/run/docker.sock:/var/run/docker.sock")
         mount_parameters+=("-v ${jenkins_home}:/var/jenkins_home")
 
+        if [ "${tls_enabled}" == true ]; then
+            assert_config_set "tls_certificate_directory"
+            if [ ! -f ${tls_certificate_directory}/jenkins.crt ] || [ ! -f ${tls_certificate_directory}/jenkins.key ]; then
+                log_error "TLS certificate or private key is not found in the configured path."
+                log_error "Ensure that the TLS certificate jenkins.crt and the private key jenkins.key exist inside the directory ${tls_certificate_directory}"
+                exit 1
+            fi
+            mount_parameters+=("--mount source=${tls_certificate_directory},target=/var/ssl/jenkins,type=bind")
+            effective_jenkins_opts="-e JENKINS_OPTS=\"--httpsCertificate=/var/ssl/jenkins/jenkins.crt --httpsPrivateKey=/var/ssl/jenkins/jenkins.key --httpsPort=${container_port_https} --httpPort=${container_port_http}\""
+        else
+            effective_jenkins_opts="-e JENKINS_OPTS=\"--httpPort=${container_port_http} --httpsPort=-1\""
+        fi
+
+        environment_variable_parameters+=(${effective_jenkins_opts})
+
         if [ ! -z "${cx_server_path}" ]; then
             if [ ${host_os} = 'windows' ] ; then
                 cx_server_path="//$(echo $cx_server_path | sed -e 's/://' -e 's/\\/\//g')"
@@ -500,7 +522,7 @@ function start_jenkins_container()
         fi
 
         # start container
-        run docker run ${user_parameter} --name "${container_name}" -d -p "${http_port}:8080" "${mount_parameters[@]}" "${environment_variable_parameters[@]}" "${image_name}"
+        run docker run ${user_parameter} --name "${container_name}" -d -p "${port_mapping}" "${mount_parameters[@]}" "${environment_variable_parameters[@]}" "${image_name}"
         if [ $? -ne "0" ]; then
             log_error "Failed to start new cx-server container."
             exit $?;
@@ -563,6 +585,7 @@ function display_help()
     echo ""
     echo "Commands:"
     command_help_text 'start'         'Starts the server container using the configured parameters for jenkins_home, docker_registry, docker_image, http_port.'
+    command_help_text 'status'        'Display status information about Cx Server'
     command_help_text 'stop'          'Stops the running server container.'
     command_help_text 'remove'        "Removes a stopped server container. A subsequent call of 'start' will instantiate a fresh container."
     command_help_text 'backup'        "Takes a backup of the configured 'jenkins_home' and stores it in the configured 'backup_directory'."
@@ -778,6 +801,21 @@ function warn_low_memory_with_confirmation() {
     fi
 }
 
+function get_port_mapping(){
+    declare -n return_value=$1
+    local mapping=""
+    if [ "${tls_enabled}" == true ]; then
+        echo "   - https_port=${https_port}"
+        assert_config_set "https_port"
+        mapping="${https_port}:${container_port_https}"
+    else
+        echo "   - http_port=${http_port}"
+        assert_config_set "http_port"
+        mapping="${http_port}:${container_port_http}"
+    fi
+    return_value=$mapping
+}
+
 ### Start of Script
 read_configuration
 
@@ -823,6 +861,8 @@ elif [ "$1" == "update" ]; then
 elif [ "$1" == "help" ]; then
     display_help
     warn_low_memory
+elif [ "$1" == "status" ]; then
+    node /cx-server/status.js "{\"cache_enabled\": \"${cache_enabled}\"}"
 else
     display_help "$1"
     warn_low_memory

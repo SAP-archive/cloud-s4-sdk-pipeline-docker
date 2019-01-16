@@ -22,13 +22,27 @@ synchronized (this) {
     if ('<%= http_proxy %>'?.trim()) {
         URL httpProxy = new URL('<%= http_proxy %>')
         println("httpProxy: ${httpProxy}")
-        core.httpProxy(httpProxy.host, httpProxy.port)
+
+        Map httpCredentials = extractCredentials(httpProxy)
+        if(!httpCredentials) {
+            core.httpProxy(httpProxy.host, httpProxy.port)
+        }
+        else {
+            core.httpProxyWithBasicAuth(httpProxy.host, httpProxy.port, httpCredentials.username, httpCredentials.password)
+        }
     }
 
     if ('<%= https_proxy %>'?.trim()) {
         URL httpsProxy = new URL('<%= https_proxy %>')
         println("httpsProxy: ${httpsProxy}")
-        core.httpsProxy(httpsProxy.host, httpsProxy.port)
+
+        Map httpsCredentials = extractCredentials(httpsProxy)
+        if(!httpsCredentials) {
+            core.httpsProxy(httpsProxy.host, httpsProxy.port)
+        }
+        else {
+            core.httpsProxyWithBasicAuth(httpsProxy.host, httpsProxy.port, httpsCredentials.username, httpsCredentials.password)
+        }
     }
 
     if (('<%= http_proxy %>'?.trim() || '<%= https_proxy %>'?.trim()) && '<%= no_proxy %>'?.trim()) {
@@ -43,4 +57,18 @@ synchronized (this) {
     }
 
     return result
+}
+
+def extractCredentials(URL proxyURL) {
+    def userInfo = proxyURL.getUserInfo()
+    if(!userInfo) {
+        return null
+    }
+
+    String[] splitted = userInfo.split(":")
+    if(splitted.length != 2) {
+        throw new Error("Failed to extract network proxy credentials. Expected format: 'http://myuser:mypass@myproxy.corp:8080'")
+    }
+
+    return [ username: URLDecoder.decode(splitted[0], "UTF-8"), password: URLDecoder.decode(splitted[1], "UTF-8") ]
 }
