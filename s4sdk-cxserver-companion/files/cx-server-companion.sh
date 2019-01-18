@@ -1,7 +1,6 @@
 #!/bin/bash
 
 readonly container_name='s4sdk-jenkins-master'
-backup_file_name="jenkins_home_$(date -u +%Y-%m-%dT%H%M%Z).tar.gz"
 readonly nexus_container_name='s4sdk-nexus'
 readonly cache_docker_image='sonatype/nexus3:3.14.0'
 readonly cxserver_companion_docker_image='s4sdk/cxserver-companion'
@@ -316,7 +315,6 @@ function print_nexus_config()
 
 function start_nexus()
 {
-    cache_enabled=${cache_enabled=true}
     if [ ${cache_enabled} = true ] ; then
         if is_running "${nexus_container_name}" ; then
             stop_nexus
@@ -667,6 +665,7 @@ function remove_networks()
 function read_configuration()
 {
     dos2unix /cx-server/mount/server.cfg
+    source /cx-server/server-default.cfg
     source /cx-server/mount/server.cfg
     if [ $? -ne 0 ]; then
         log_error 'Failed to load config from server.cfg file.'
