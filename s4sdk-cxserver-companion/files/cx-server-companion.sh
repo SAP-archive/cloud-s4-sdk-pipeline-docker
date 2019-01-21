@@ -247,6 +247,12 @@ function stop_jenkins_container()
     retry 360 5 0 "is_container_status ${container_name} 'exited'"
 }
 
+function stop_jenkins_unsafe()
+{
+    echo 'Force-stopping Cx server'
+    docker stop ${container_name}
+}
+
 function stop_nexus()
 {
     nexus_container_id="$(get_container_id "${nexus_container_name}")"
@@ -257,6 +263,12 @@ function stop_nexus()
         run docker stop "${nexus_container_name}"
         remove_networks
     fi
+}
+
+function stop_nexus_unsafe()
+{
+    echo 'Force-stopping nexus'
+    docker stop ${nexus_container_name}
 }
 
 function get_image_environment_variable()
@@ -849,9 +861,14 @@ elif [ "$1" == "start" ]; then
     start_nexus
     start_jenkins
 elif [ "$1" == "stop" ]; then
-    check_image_update
-    stop_jenkins
-    stop_nexus
+    if [ "$2" == "--force" ]; then
+        stop_jenkins_unsafe
+        stop_nexus_unsafe
+    else
+        check_image_update
+        stop_jenkins
+        stop_nexus
+    fi
 elif [ "$1" == "start_cache" ]; then
     start_nexus
 elif [ "$1" == "stop_cache" ]; then
