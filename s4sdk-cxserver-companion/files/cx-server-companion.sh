@@ -6,7 +6,7 @@ readonly cache_docker_image='sonatype/nexus3:3.14.0'
 readonly cxserver_companion_docker_image='s4sdk/cxserver-companion'
 readonly container_port_http=8080
 readonly container_port_https=8443
-readonly debug_port='5005'
+
 readonly network_name='s4sdk-network'
 
 readonly bold_start="\033[1m"
@@ -493,22 +493,12 @@ function start_jenkins_container()
             user_parameter="-u 1000:${docker_gid}"
         fi
 
-        local additional_java_opts=()
-
-        if [ ! -z ${DEVELOPER_MODE} ]; then
-            additional_java_opts+=("-agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=5005")
-        fi
-
         if [ ! -z "${x_java_opts}" ]; then
-            additional_java_opts+=("${x_java_opts}")
-        fi
-
-        if [ ! ${#additional_java_opts[@]} -eq 0 ]; then
             local container_java_opts="$(get_image_environment_variable "${image_name}" JAVA_OPTS)"
-            local effective_java_opts="-e JAVA_OPTS=\"${container_java_opts} ${additional_java_opts[@]}\""
+            local effective_java_opts="-e JAVA_OPTS=\"${container_java_opts} ${x_java_opts}\""
         fi
 
-        local environment_variable_parameters=()
+        local environment_variable_parameter=()
         if [ ${cache_enabled} = true ] ; then
             environment_variable_parameters+=(" -e DL_CACHE_NETWORK=${network_name}")
         fi
@@ -541,16 +531,8 @@ function start_jenkins_container()
             mount_parameters+=("-v \"${cx_server_path}\":/var/cx-server:ro")
         fi
 
-        local port_mapping=()
-        port_mapping+=("-p ${http_port}:8080")
-
-        if [ ! -z ${DEVELOPER_MODE} ]; then
-          port_mapping+=("-p ${debug_port}:5005")
-        fi
-
         # start container
-        run docker run ${user_parameter} --name "${container_name}" -d "${port_mapping[@]}" "${mount_parameters[@]}" "${environment_variable_parameters[@]}" "${image_name}"
-
+        run docker run ${user_parameter} --name "${container_name}" -d -p "${port_mapping}" "${mount_parameters[@]}" "${environment_variable_parameters[@]}" "${image_name}"
         if [ $? -ne "0" ]; then
             log_error "Failed to start new cx-server container."
             exit $?;
