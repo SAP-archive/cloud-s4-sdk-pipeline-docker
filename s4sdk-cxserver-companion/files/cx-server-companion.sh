@@ -522,6 +522,10 @@ function start_jenkins_container()
             effective_jenkins_opts="-e JENKINS_OPTS=\"--httpPort=${container_port_http} --httpsPort=-1\""
         fi
 
+        if [ -e /cx-server/mount/jenkins-configuration ]; then
+            environment_variable_parameters+=(-e CASC_JENKINS_CONFIG=/var/cx-server/jenkins-configuration)
+        fi
+
         environment_variable_parameters+=(${effective_jenkins_opts})
 
         if [ ! -z "${cx_server_path}" ]; then
