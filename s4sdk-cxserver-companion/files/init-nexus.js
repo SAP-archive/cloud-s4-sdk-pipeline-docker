@@ -94,7 +94,12 @@ function runScript() {
             }
         })
         .on('response', function (response) {
-            console.log(`Run nexus initialization script, response: ${response.statusMessage}`)
+            if (!isInSuccessFamily(response.statusCode)) {
+                console.log(`Unexpected status: "${response.statusMessage}" when running nexus initialization script.`)
+                process.exit(1)
+            } else {
+                console.log('Nexus successfully initialized.')
+            }
         })
 }
 
