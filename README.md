@@ -1,8 +1,8 @@
-# Dockerfiles for the SAP S/4HANA Cloud SDK Pipeline
+# Dockerfiles for the SAP Cloud SDK Pipeline
  
 ## Description
 
-This collection of Dockerfiles builds the foundation for the Docker images used by the [Pipeline for the SAP S/4HANA Cloud SDK](https://github.com/SAP/cloud-s4-sdk-pipeline).
+This collection of Dockerfiles builds the foundation for the Docker images used by the [Pipeline for the SAP Cloud SDK](https://github.com/SAP/cloud-s4-sdk-pipeline).
 It contains two type of Dockerfiles. 
 The folder `s4sdk-jenkins-master` contains a Dockerfile for a Jenkins server, which is preconfigured to run the pipeline.
 The other folders contain Dockerfiles for Docker images which are used in the pipeline to run steps, such as deployments to the SAP Cloud Platform. 
@@ -25,8 +25,8 @@ Afterwards the image is available and a new container can be spawned with follow
 
 The same applies to all other Dockerfiles.
 
-The SAP S/4HANA Cloud SDK already provides a script called `cx-server` to avoid these manual steps. It can be found in the same named folder on the root of each SAP S/4HANA Cloud SDK project archetype. Together with the `server.cfg` file, this is all you need for starting your instance of the SAP S/4HANA Cloud SDK Cx Server.  
-For instantiating the SAP S/4HANA Cloud SDK Cx Server, you need to provide a suitable host with a Linux operating system and Docker installed. Please also ensure that the user with whom you start the Cx Server belongs to the [docker group](https://docs.docker.com/engine/installation/linux/linux-postinstall/).
+The SAP Cloud SDK already provides a script called `cx-server` to avoid these manual steps. It can be found in the same named folder on the root of each SAP Cloud SDK project archetype. Together with the `server.cfg` file, this is all you need for starting your instance of the SAP Cloud SDK Cx Server.  
+For instantiating the SAP Cloud SDK Cx Server, you need to provide a suitable host with a Linux operating system and Docker installed. Please also ensure that the user with whom you start the Cx Server belongs to the [docker group](https://docs.docker.com/engine/installation/linux/linux-postinstall/).
 
 To create a new project using the SDK execute the following command:
  
