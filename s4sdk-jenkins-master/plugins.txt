@@ -3,7 +3,7 @@ badge
 blueocean
 build-monitor-plugin
 build-timeout
-checkmarx
+checkmarx:8.80.3
 cobertura
 command-launcher
 configuration-as-code
