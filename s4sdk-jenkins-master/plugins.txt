@@ -3,7 +3,7 @@ badge
 blueocean
 build-monitor-plugin
 build-timeout
-checkmarx
+checkmarx:8.80.3
 cobertura
 command-launcher
 configuration-as-code
@@ -20,6 +20,7 @@ github-branch-source
 greenballs
 htmlpublisher
 http_request
+influxdb
 jacoco
 job-dsl
 junit
