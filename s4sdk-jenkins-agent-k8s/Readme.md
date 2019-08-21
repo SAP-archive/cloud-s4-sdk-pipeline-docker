@@ -1,4 +1,6 @@
 # s4sdk-jenkins-agent-k8s
+:exclamation: **DEPRECATED!** This image is deprecated. Please use the [jenkins/jnlp-slave](https://hub.docker.com/r/jenkins/jnlp-slave/) instead.
+
 
 This is a docker version of Jenkins JNLP agent  which is an extension to [jenkinsci/jnlp-slave](https://hub.docker.com/r/jenkins/jnlp-slave/).
 
