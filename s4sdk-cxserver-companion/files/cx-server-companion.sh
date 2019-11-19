@@ -926,8 +926,51 @@ function get_port_mapping(){
     return_value=$mapping
 }
 
+function warn_and_offer_migration()
+{
+    log_warn "Since October 2019 the s4sdk/jenkins-master image ist deprecated. The docker images for the SAP Cloud SDK are now maintained in the repository https://github.com/SAP/devops-docker-cx-server"
+    log_warn "This migration will start the backup of your jenkins-home volume, stop and remove s4sdk-jenkins-master as well as the s4sdk-nexus containers and finally switch to the new docker images. Those tasks will result in a few minutes of downtime."
+    read -n 1 -p "Do you want to migrate now? (Y/N): " input
+    echo ""
+    if [[ "$input" == "y" ]] || [[ "$input" == "Y" ]]; then
+        backup_volume
+        stop_nexus
+        stop_jenkins
+        remove_containers
+        remove_networks
+        if [[ "${host_os}" = windows ]] ; then
+            cat /cx-server/ppiper-cx-server.bat > /cx-server/mount/cx-server.bat
+        else
+            cat /cx-server/ppiper-cx-server > /cx-server/mount/cx-server
+        fi
+        local newImage=$(get_ppiper_jenkins_image_for_migration)
+        if [[ ! -z "$newImage" ]]; then
+            sed -i "/docker_image/c\docker_image=\"$newImage\"" /cx-server/mount/server.cfg
+            log_info "Success! Updated cx-server script and server.cfg. Please execute './cx-server start' now"
+        else
+            log_info "Could not determine the configured docker_image. Updated only cx-server script. Please execute './cx-server start' now"
+        fi
+        exit 0
+    else
+        echo "No changes will be applied"
+    fi
+}
+
+function get_ppiper_jenkins_image_for_migration()
+{
+    if [[ $docker_image =~ ^s4sdk/jenkins-master:v[0-9]+$ ]]; then
+        # TODO Update this version as soon as a new version is released
+        echo "ppiper/jenkins-master:v2"
+    elif [[ $docker_image =~ ^s4sdk/jenkins-master:latest$ ]] || [[ $docker_image =~ ^s4sdk/jenkins-master$ ]]; then
+        echo "ppiper/jenkins-master:latest"
+    else
+        echo ""
+    fi
+}
+
 ### Start of Script
 read_configuration
+warn_and_offer_migration
 
 # ensure that docker is installed
 command -v docker > /dev/null 2>&1 || { echo >&2 "Docker does not seem to be installed. Please install docker and ensure that the docker command is included in \$PATH."; exit 1; }
